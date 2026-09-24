@@ -1,0 +1,232 @@
+---
+title: "importing"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Cmd+Shift+Enter*. 
+
+libraries
+```{r}
+library(tidyverse)
+library(dplyr)
+library(readxl)
+library(writexl)
+library(ggplot2)
+library(zoo)
+```
+
+Overall is to combine the complete set of data from 09/30/2009 — 09/30/2025 (found https://fiscaldata.treasury.gov/datasets/judgment-fund-report-to-congress/judgment-fund-annual-report-to-congress)
+with the incomplete data from 09-30-25 to date
+
+importing the 09/30/2009 — 09/30/2025 dataset
+```{r}
+data_from_09.30.2009_to_09.30.2025 <- read_csv("JudgFundRprtCongress.csv")
+#parsing issues bcs some values are "null" and thus not expected character type
+```
+importing the incomplete data from 10/1/25- 08/31/26, from
+https://fiscalcrm.my.site.com/jfpaymentsearch/s/
+
+NB: in order to download this data you have to select certain 'search fields' (ie departments) which is unforunately inconsistent with
+my effort to do all the filtering in the same place (here). 
+It also produces 2 files, 1 for claims resolved through litigation and 1 for claims resolved administratively 
+```{r}
+admin_data_from_10.1.2025_to_08.31.2026 <- read_csv("JFPaymentAdministrativeReport_09-24-2026_122851.csv")
+ligi_data_from_10.1.2025_to_08.31.2026 <- read_csv("JFPaymentLitigativeReport_09-24-2026_122844.csv")
+```
+okay now we have to reconcile these data sets into one giant data set. 
+
+the first step is making sure the variables of each data set match. 
+Im changing the variable names to be more usable as well. In principle, I'm mostly changing the incomplete datasets to match the complete set, except that im changing 'confirmed payment amount' to be 'payment amount' in both since some are implicitly not confirmed, and that I use this step to filter out the variable 'record date' which seems meaningless and confusing since it has little relationship with the date on which the payment was made, nor does it seem to be the date on which the lawsuit was filed. see  the judgement fund dataset dictionary for more
+
+```{r}
+data_from_09.30.2009_to_09.30.2025 <- data_from_09.30.2009_to_09.30.2025 |>
+  select(judgment_type_code = `Judgment Type Code`, 
+         defendent_agency_name = `Defendant Agency Name`,
+         submitting_agency_name = `Submitting Agency Name`,
+         control_number = `Control Number`,
+         plaintiffs_counsel_name = `Plaintiffs Counsel Name`,
+         payment_id_number = `Payment ID Number`,
+         payment_sent_date = `Payment Sent Date`,
+         payment_amount = `Confirmed Payment Amount`,
+         principle_amount = `Principal Amount`,
+         principle_citation_code = `Principal Citation Code`,
+         principle_citation_code_description = `Principal Citation Code Description`,
+         attorneys_fee_amount = `Attorneys Fee Amount`,
+         attorneys_fee_citation_code = `Attorneys Fee Citation Code`,
+         attorneys_fee_citation_code_description = `Attorneys Fee Citation Code Description`,
+         cost_amount = `Cost Amount`,
+         cost_citation_code = `Cost Citation Code`,
+         cost_citation_code_description = `Cost Citation Code Description`,
+         interest_amount = `Interest Amount`,
+         interest_citation_code = `Interest Citation Code`,
+         interest_citation_code_description = `Interest Citation Code Description`,
+         source_line_number = `Source Line Number`
+         )|>
+  filter(payment_id_number!="null")|>
+  mutate(payment_id_number = as.numeric(payment_id_number))
+  
+
+admin_data_from_10.1.2025_to_08.31.2026 <- admin_data_from_10.1.2025_to_08.31.2026 |>
+  select(defendent_agency_name = `Defendant Agency Name`,
+    control_number = `Control #`,
+    payment_id_number = `Payment ID #`,
+    payment_sent_date = `Payment Sent Date`,
+    principle_amount = `Principal Amount`,
+    principle_citation_code = `Principal Citation Code`,
+    principle_citation_code_description = `Principal Citation Code Description`,
+    attorneys_fee_amount = `Attorney Fees Amount`,
+    attorneys_fee_citation_code = `Attorney Fees Citation Code`,
+    attorneys_fee_citation_code_description = `Attorney Fees Citation Code Description`,
+    cost_amount = `Cost Amount`,
+    cost_citation_code = `Cost Citation Code`,
+    cost_citation_code_description = `Cost Citation Code Description`,
+    interest_amount = `Interest Amount`,
+    interest_citation_code = `Interest Citation Code`,
+    interest_citation_code_description = `Interest Citation Code Description`,
+    payment_amount = `Payment Amount`) |>
+  add_column(judgment_type_code = "Administrative")|>
+  filter(payment_id_number!="null")
+    
+liti_data_from_10.1.2025_to_08.31.2026 <- ligi_data_from_10.1.2025_to_08.31.2026 |>
+  select(defendent_agency_name = `Defendant Agency Name`,
+    control_number = `Control #`,
+    payment_id_number = `Payment ID #`,
+    payment_sent_date = `Payment Sent Date`,
+    principle_amount = `Principal Amount`,
+    principle_citation_code = `Principal Citation Code`,
+    principle_citation_code_description = `Principal Citation Code Description`,
+    attorneys_fee_amount = `Attorney Fees Amount`,
+    attorneys_fee_citation_code = `Attorney Fees Citation Code`,
+    attorneys_fee_citation_code_description = `Attorney Fees Citation Code Description`,
+    cost_amount = `Cost Amount`,
+    cost_citation_code = `Cost Citation Code`,
+    cost_citation_code_description = `Cost Citation Code Description`,
+    interest_amount = `Interest Amount`,
+    interest_citation_code = `Interest Citation Code`,
+    interest_citation_code_description = `Interest Citation Code Description`,
+    payment_amount = `Payment Amount`)|>
+  add_column(judgment_type_code = "Litigative")|>
+  filter(payment_id_number!="null")
+
+```
+
+combining the data sets into one big data set
+
+```{r}
+mega_data<-bind_rows(data_from_09.30.2009_to_09.30.2025, liti_data_from_10.1.2025_to_08.31.2026, admin_data_from_10.1.2025_to_08.31.2026)
+```
+
+now we have to filter the data to get what's relevant
+
+```{r}
+mega_data<-mega_data|>
+  #first we filter just to claims against dhs... sort of. It's all claims against dhs (that i recognized) minus, for now, those that mention the coast guard but not dhs explicitly
+  filter(defendent_agency_name %in% c("Coast Guard at DHS",
+                                      "Customs and Border Protection",
+                                      "DHS - Federal Protection Service",
+                                      "DHS - Immigration  & Customs Enforcement (ICE)",
+                                      "DHS - TSA  Trans. SEC. Admin.",
+                                      "Homeland Security",
+                                      "Homeland Security; DHS - Immigration  & Customs Enforcement (ICE)",
+                                      "Immigration & Nat",
+                                      "Secret Service at Homeland Security",
+                                      "Customs and Boarder Protection",
+                                      "DHS - TSA Trans. SEC. Admin.",
+                                      "Customs and Border Protection; Admin for Children and Family; Admin for Children and Family; DHS - Immigration  & Customs Enforcement (ICE); Homeland Security",
+                                      "Customs and Border Protection; DHS - Immigration  & Customs Enforcement (ICE)",
+                                      "Customs and Border Protection; Homeland Security; Admin for Children and Family",
+                                      "Customs and Border Protection; Homeland Security; DHS - Immigration  & Customs Enforcement (ICE); Department of Health and Human Services; Citizen & Immig Svc (USCIS)",
+                                      "Customs and Border Protection; Marketing and Regulatory Programs B",
+                                      "DHS - Immigration  & Customs Enforcement (ICE); DHS - Immigration  & Customs Enforcement (ICE)",
+                                      "FLETC at Homeland Security",
+                                      "General Services Administration; DHS - Immigration  & Customs Enforcement (ICE)",
+                                      "Customs and Border Protection; Immigration & Custom; Internal Revenue Service/S&E",
+                                      "Immigration & Custom",
+                                      "DHS - Office of the Inspector General",
+                                      "Citizen & Immig Svc (USCIS); Department of State",
+                                      "Customs and Border Protection; Marshals Service",
+                                      "DHS-Immigration Sevc",
+                                      "Drug Enforcement Adm; Fed Bureau of Invest; Natl Guard Bureau; Natl Park Service; Secret Service at Homeland Security",
+                                      "Citizen & Immig Svc (USCIS); Homeland Security",
+                                      "Customs and Border Protection; Internal Revenue Service/S&E",
+                                      "DHS-Operations CG",
+                                      "Alcohol Tobacco Fire; Bur of Land Mgmt; Customs and Border Protection; Department of Navy; Department of Transportation; DHS - Immigration  & Customs Enforcement (ICE); Drug Enforcement Adm; Environmental Protection Agency; Fed Aviation Admin; Fed Bureau of Invest; Fish & Wildlife Svc; FLETC at Homeland Security; Forest Service; Internal Revenue Service/S&E; Marshals Service; Off of the Inspector General; Office of Personnel Management; Office of the Secretary of Defense - Agencies; Secret Service at Homeland Security" ,
+                                      "Citizen & Immig Svc",
+                                      "DHS - TSA  Trans. SEC. Admin.; Office of Personnel Management",
+                                      "Ctr for Disease Cont; Def Logistics Agency; Department of Agriculture; Department of Commerce; Department of Housing and Urban Development; Department of Justice; Department of Labor; Department of Navy; Department of the Air Force; Department of the Army; Department of the Interior; Department of Veterans Affairs; Environmental Protection Agency; Fed Aviation Admin; General Services Administration; Homeland Security; National Aeronautics and Space Administration; Small Business Administration; United States Postal Service",
+                                      "Customs and Border Protection; DHS - Immigration  & Customs Enforcement (ICE); DHS - TSA  Trans. SEC. Admin.; Fed Bureau of Invest",
+                                      "DHS - TSA  Trans. SEC. Admin.; Fed Bureau of Invest",
+                                      "Homeland Security; Natl Oceanic & Atmos",
+                                      "DHS - TSA  Trans. SEC. Admin.; Homeland Security",
+                                      "Fed Protect Svc; Homeland Security",
+                                      "Alcohol Tobacco Fire; Customs and Border Protection; Department of Agriculture; Department of Navy; Department of the Interior; Department of Transportation; DHS - Immigration  & Customs Enforcement (ICE); Drug Enforcement Adm; Environmental Protection Agency; Fed Aviation Admin; Fed Bureau of Invest; FLETC at Homeland Security; Internal Revenue Service/S&E; Marshals Service; Off of the Inspector General; Office of Personnel Management; Office of the Secretary of Defense - Agencies; Secret Service at Homeland Security",
+                                      "Customs and Border Protection; Department of Justice",
+                                      "DHS - BDR. and Trans. SEC. HQ",
+                                      "DHS - Federal Air Marshalls",
+                                      "DHS - Immigration  & Customs Enforcement (ICE); Marshals Service",
+                                      "Homeland Security; Natl Security Agency",
+                                      "Central Intelligence Agency; Def Logistics Agency; Department of Agriculture; Department of Commerce; Department of Energy; Department of Justice; Department of Navy; Department of the Air Force; Department of the Army; Department of the Interior; Department of the Treasury; Department of Transportation; Department of Veterans Affairs; Government Printing Office; Homeland Security; National Aeronautics and Space Administration; Office of the Secretary of Defense - Agencies; U.S. Nuclear Regulatory Commission",
+                                      "Customs and Border Protection; DHS - TSA  Trans. SEC. Admin.; Homeland Security",
+                                      "Department of Commerce; Department of Education; Department of Energy; Department of Health and Human Services; Department of Housing and Urban Development; Department of Justice; Department of Labor; Department of State; Department of the Interior; Department of the Treasury; Department of Transportation; Department of Veterans Affairs; Homeland Security; Office of the Secretary of Defense - Agencies; OMB",
+                                      "Central Intelligence Agency; Def Logistics Agency; Department of Agriculture; Department of Commerce; Department of Energy; Department of Justice; Department of Navy; Department of the Air Force; Department of the Army; Department of the Interior; Department of the Treasury; Department of Transportation; Department of Veterans Affairs; Government Printing Office; Homeland Security; National Aeronautics & Space Admin; Ofc of the Secretary of Defense; U.S. Nuclear Regulatory Commission",
+                                      "Citizen & Immig Svc; DHS-Immig & Customs-ICE",
+                                      "Coast Guard; Def Logistics Agency; Department of Agriculture; Department of Energy; Department of Navy; Department of the Air Force; Department of the Army; Department of Veterans Affairs; Fed Aviation Admin; FLETC at DHS; Marine Corps; Natl Guard Bureau; US Army Corps of Engineers",
+                                      "Coast Guard; Department of Agriculture; Department of Navy; Department of the Air Force; Department of the Army; Department of Veterans Affairs; Fed Aviation Admin; FLETC at DHS; Marine Corps; Natl Guard Bureau; US Army Corps of Engineers",
+                                      "Coast Guard; Department of Navy; Department of the Air Force; Department of the Army; Homeland Security",
+                                      "Customs & Border Pro",
+                                      "Department of Agriculture; Department of Education; Department of Energy; Department of Justice; DHS-Immig & Customs-ICE; FEMA; General Accounting Office; U.S. Nuclear Regulatory Commission",
+                                      "Department of State; Homeland Security",
+                                      "DHS-Immig & Customs-ICE",
+                                      "DHS-TSA Trans SEC Admin",
+                                      "DHS-Federal Protect Svc",
+                                      "DHS-OIG",
+                                      "DHS-OIG; Homeland Security",
+                                      "FEMA at DHS",
+                                      "FLETC at DHS",
+                                      "Customs and Border Protection; Homeland Security",
+                                      "Department of Justice; Homeland Security",
+                                      "DHS - Federal Protection Service; DHS - Immigration  & Customs Enforcement (ICE)",
+                                      "Customs and Border Protection; DHS - Immigration  & Customs Enforcement (ICE); Fed Bureau of Invest",
+                                      "Department of State; DHS - TSA  Trans. SEC. Admin.; Government Printing Office",
+                                      "Customs and Border Protection; Department of Health and Human Services"
+                                      ))|>
+filter(principle_citation_code_description %in% c("Federal Tort Claims Act/Settlement/Traffic",
+                                                    "Federal Tort Claims Act/Settlement/Fls-Arrest",
+                                                    "Federal Tort Claims Act/Settlement/Miscellany",
+                                                    "Federal Tort Claims Act/Court Judgment/Miscellany",
+                                                    "Federal Tort Claims Act/Settlement/Fire-Flood",
+                                                    "Federal Tort Claims Act/Settlement/Prop-Maint",
+                                                    "Federal Tort Claims Act/Settlement/Med Mal",
+                                                    "Federal Tort Claims Act/Court Judgment/Fls-Arrest",
+                                                    "Federal Tort Claims Act/Admin/Traffic",
+                                                    "Federal Tort Claims Act/Settlement/Camp Lejeune Justice Act 2022 (CLJA)",
+                                                    "Federal Tort Claims Act/Court Judgment/Med Mal",
+                                                    "Federal Tort Claims Act/Court Judgment/Prop-Maint",
+                                                    "Federal Tort Claims Act/Court Judgment/Prop-Seize",
+                                                    "Federal Tort Claims Act/Admin/Miscellany",
+                                                    "Federal Tort Claims Act/Admin/Prop-Maint",
+                                                    "Federal Tort Claims Act/Admin/Fire-Flood",
+                                                    "Federal Tort Claims Act/Admin/Med Mal",
+                                                    "Federal Tort Claims AcAircrasht/Admin/Aircrash",
+                                                    "Federal Tort Claims Act/Admin/Camp Lejeune Justice Act 2022 (CLJA)",
+                                                    "Water/CLJA Federal Tort Claims Act/Admin/Camp Lejeune Act 2022 (CLJA)" ,
+                                                    "Federal Tort Claims Act/Admin/Prop-Seize",
+                                                    "Federal Tort Claims Act/Admin/Fls-Arrest",
+                                                    "Federal Tort Claims Act/Court Judgment/Aircrash",
+                                                    "Federal Tort Claims Act/Court/Fire-Flood"
+                                                    ))
+
+  
+```
+
+```
+
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Cmd+Option+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Cmd+Shift+K* to preview the HTML file). 
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
+
