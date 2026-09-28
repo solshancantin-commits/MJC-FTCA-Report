@@ -192,37 +192,290 @@ mega_data<-mega_data|>
                                       "Department of State; DHS - TSA  Trans. SEC. Admin.; Government Printing Office",
                                       "Customs and Border Protection; Department of Health and Human Services"
                                       ))|>
-filter(principle_citation_code_description %in% c("Federal Tort Claims Act/Settlement/Traffic",
-                                                    "Federal Tort Claims Act/Settlement/Fls-Arrest",
-                                                    "Federal Tort Claims Act/Settlement/Miscellany",
-                                                    "Federal Tort Claims Act/Court Judgment/Miscellany",
-                                                    "Federal Tort Claims Act/Settlement/Fire-Flood",
-                                                    "Federal Tort Claims Act/Settlement/Prop-Maint",
-                                                    "Federal Tort Claims Act/Settlement/Med Mal",
-                                                    "Federal Tort Claims Act/Court Judgment/Fls-Arrest",
-                                                    "Federal Tort Claims Act/Admin/Traffic",
-                                                    "Federal Tort Claims Act/Settlement/Camp Lejeune Justice Act 2022 (CLJA)",
-                                                    "Federal Tort Claims Act/Court Judgment/Med Mal",
-                                                    "Federal Tort Claims Act/Court Judgment/Prop-Maint",
-                                                    "Federal Tort Claims Act/Court Judgment/Prop-Seize",
-                                                    "Federal Tort Claims Act/Admin/Miscellany",
-                                                    "Federal Tort Claims Act/Admin/Prop-Maint",
-                                                    "Federal Tort Claims Act/Admin/Fire-Flood",
-                                                    "Federal Tort Claims Act/Admin/Med Mal",
-                                                    "Federal Tort Claims AcAircrasht/Admin/Aircrash",
-                                                    "Federal Tort Claims Act/Admin/Camp Lejeune Justice Act 2022 (CLJA)",
-                                                    "Water/CLJA Federal Tort Claims Act/Admin/Camp Lejeune Act 2022 (CLJA)" ,
-                                                    "Federal Tort Claims Act/Admin/Prop-Seize",
-                                                    "Federal Tort Claims Act/Admin/Fls-Arrest",
-                                                    "Federal Tort Claims Act/Court Judgment/Aircrash",
-                                                    "Federal Tort Claims Act/Court/Fire-Flood"
-                                                    ))
+  filter(principle_citation_code %in% c("28-USC-2677 Traffic", 
+                                        "28-USC-2677 Miscellany",
+                                        "28 USC 1346(b) Fls-Arrest",
+                                        "28-USC-2677 Fls-Arrest",
+                                        "28-USC-2677 Med Mal",
+                                        "28 USC 1346(b) Prop-Maint",
+                                        "28-USC-2672 Miscellany",
+                                        "28-USC-2672 Traffic",
+                                        "28-USC-2672 Prop-Maint",
+                                        "28 USC 1346(b) Traffic",
+                                        "28-USC-2677 Prop-Maint",
+                                        "28-USC-2672  Fire-Flood",
+                                        "28-USC-2672 Prop-Seize",
+                                        "28-USC-2672 Fls-Arrest",
+                                        "28 USC 1346(b) Prop-Seize",
+                                        "28-USC-2677 Prop-Seize",
+                                        "28 USC 1346(b) Miscellany",
+                                        "28-USC-2672 Med Mal",
+                                        "28-USC-2672 Aircrash"
+                                        ))
+#version using citation code description: 
+#filter(principle_citation_code_description %in% c("Federal Tort Claims Act/Settlement/Traffic",
+#                                                     "Federal Tort Claims Act/Settlement/Fls-Arrest",
+#                                                     "Federal Tort Claims Act/Settlement/Miscellany",
+#                                                     "Federal Tort Claims Act/Court Judgment/Miscellany",
+#                                                     "Federal Tort Claims Act/Settlement/Fire-Flood",
+#                                                     "Federal Tort Claims Act/Settlement/Prop-Maint",
+#                                                     "Federal Tort Claims Act/Settlement/Med Mal",
+#                                                     "Federal Tort Claims Act/Court Judgment/Fls-Arrest",
+#                                                     "Federal Tort Claims Act/Admin/Traffic",
+#                                                     "Federal Tort Claims Act/Settlement/Camp Lejeune Justice Act 2022 (CLJA)",
+#                                                     "Federal Tort Claims Act/Court Judgment/Med Mal",
+#                                                     "Federal Tort Claims Act/Court Judgment/Prop-Maint",
+#                                                     "Federal Tort Claims Act/Court Judgment/Prop-Seize",
+#                                                     "Federal Tort Claims Act/Admin/Miscellany",
+#                                                     "Federal Tort Claims Act/Admin/Prop-Maint",
+#                                                     "Federal Tort Claims Act/Admin/Fire-Flood",
+#                                                     "Federal Tort Claims Act/Admin/Med Mal",
+#                                                     "Federal Tort Claims AcAircrasht/Admin/Aircrash",
+#                                                     "Federal Tort Claims Act/Admin/Camp Lejeune Justice Act 2022 (CLJA)",
+#                                                     "Water/CLJA Federal Tort Claims Act/Admin/Camp Lejeune Act 2022 (CLJA)" ,
+#                                                     "Federal Tort Claims Act/Admin/Prop-Seize",
+#                                                     "Federal Tort Claims Act/Admin/Fls-Arrest",
+#                                                     "Federal Tort Claims Act/Court Judgment/Aircrash",
+#                                                     "Federal Tort Claims Act/Court/Fire-Flood"
+#                                                     ))
 
   
 ```
 
+lets mutate mega_data to add a column floor_date that marks the first day of the month that a claim was paid out. This will allow us-hopefully- to create graphs that count the number of claims in a given month in a given yera. It's not the most elegant solution but its the only one I could find.  
+```{r}
+mega_data<-mega_data |>
+  mutate(
+    floor_date = floor_date(payment_sent_date, "month")
+  )
 ```
 
+Now we create a new 'summary' dataframe where we can store some of our summary statistics
+```{r}
+mega_data_summary <- mega_data%>%
+  group_by(floor_date) %>%
+    summarize(count = n_distinct(payment_id_number), 
+              payment_amount_sum = sum(payment_amount), 
+              payment_amount_median = median(payment_amount),
+              count_citation_code_traffic = n_distinct(payment_id_number[principle_citation_code %in% c("28-USC-2677 Traffic",
+                                                                                                  "28-USC-2672 Traffic",
+                                                                                                  "28 USC 1346(b) Traffic"
+                                                                                                  )]),
+              count_citation_code_flsarrest = n_distinct(payment_id_number[principle_citation_code %in% c("28 USC 1346(b) Fls-Arrest",
+                                                                                                  "28-USC-2677 Fls-Arrest",
+                                                                                                  "28-USC-2672 Fls-Arrest"
+                                                                                                  )]),
+              count_citation_code_med_mal = n_distinct(payment_id_number[principle_citation_code %in% c("28-USC-2677 Med Mal",
+                                                                                                  "28-USC-2672 Med Mal"
+                                                                                                  )]),
+              count_citation_code_propmaint = n_distinct(payment_id_number[principle_citation_code %in% c("28 USC 1346(b) Prop-Maint",
+                                                                                                  "28-USC-2672 Prop-Maint",
+                                                                                                  "28-USC-2677 Prop-Maint"
+                                                                                                  )]),
+              count_citation_code_fireflood = n_distinct(payment_id_number[principle_citation_code %in% c("28-USC-2672  Fire-Flood"
+                                                                                                  )]),
+              count_citation_code_propseize = n_distinct(payment_id_number[principle_citation_code %in% c("28-USC-2672 Prop-Seize",
+                                                                                                     "28 USC 1346(b) Prop-Seize",
+                                                                                                     "28-USC-2677 Prop-Seize"
+                                                                                                  )]),
+              count_citation_code_flsarrest = n_distinct(payment_id_number[principle_citation_code %in% c("28-USC-2672 Fls-Arrest",
+                                                                                                           "28 USC 1346(b) Fls-Arrest",
+                                                                                                           "28-USC-2677 Fls-Arrest"
+                                                                                                  )]),
+              count_citation_code_miscellany = n_distinct(payment_id_number[principle_citation_code %in% c("28-USC-2677 Miscellany",
+                                                                                                           "28-USC-2672 Miscellany",
+                                                                                                           "28 USC 1346(b) Miscellany"
+                                                                                                  )]),
+              count_citation_code_aircrash = n_distinct(payment_id_number[principle_citation_code %in% c("28-USC-2672 Aircrash"
+                                                                                                  )]),
+              payment_sum_citation_code_traffic = sum(payment_amount[principle_citation_code %in% c("28-USC-2677 Traffic",
+                                                                                                  "28-USC-2672 Traffic",
+                                                                                                  "28 USC 1346(b) Traffic"
+                                                                                                  )]),
+              payment_sum_citation_code_flsarrest = sum(payment_amount[principle_citation_code %in% c("28 USC 1346(b) Fls-Arrest",
+                                                                                                  "28-USC-2677 Fls-Arrest",
+                                                                                                  "28-USC-2672 Fls-Arrest"
+                                                                                                  )]),
+              payment_sum_citation_code_med_mal = sum(payment_amount[principle_citation_code %in% c("28-USC-2677 Med Mal",
+                                                                                                  "28-USC-2672 Med Mal"
+                                                                                                  )]),
+              payment_sum_citation_code_propmaint = sum(payment_amount[principle_citation_code %in% c("28 USC 1346(b) Prop-Maint",
+                                                                                                  "28-USC-2672 Prop-Maint",
+                                                                                                  "28-USC-2677 Prop-Maint"
+                                                                                                  )]),
+              payment_sum_citation_code_fireflood = sum(payment_amount[principle_citation_code %in% c("28-USC-2672  Fire-Flood"
+                                                                                                  )]),
+              payment_sum_citation_code_propseize = sum(payment_amount[principle_citation_code %in% c("28-USC-2672 Prop-Seize",
+                                                                                                     "28 USC 1346(b) Prop-Seize",
+                                                                                                     "28-USC-2677 Prop-Seize"
+                                                                                                  )]),
+              payment_sum_citation_code_flsarrest = sum(payment_amount[principle_citation_code %in% c("28-USC-2672 Fls-Arrest",
+                                                                                                           "28 USC 1346(b) Fls-Arrest",
+                                                                                                           "28-USC-2677 Fls-Arrest"
+                                                                                                  )]),
+              payment_sum_citation_code_miscellany = sum(payment_amount[principle_citation_code %in% c("28-USC-2677 Miscellany",
+                                                                                                           "28-USC-2672 Miscellany",
+                                                                                                           "28 USC 1346(b) Miscellany"
+                                                                                                  )]),
+              payment_sum_citation_code_aircrash = sum(payment_amount[principle_citation_code %in% c("28-USC-2672 Aircrash"
+                                                                                                  )])
+    )
+
+```
+
+now let's try to create some line graphs tracking changes in each of these  statistics over time
+```{r}
+#count of claims paid each month over time
+
+ggplot(mega_data_summary, aes(x = floor_date, y = count)) +
+  geom_line()+
+  scale_y_continuous(breaks = scales::pretty_breaks(n = 10), name = "Number of claims",
+                     expand = c(0, 0), limits = c(0, NA))+
+  scale_x_date(date_breaks = "1 year", date_minor_breaks = "1 month", labels = scales::label_date_short())+
+  theme_light()+
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
+  ggtitle("Number of successful claims by month and year")
+
+#alternative look
+ggplot(mega_data_summary, aes(x = floor_date, y = count)) +
+  geom_point()+
+  geom_smooth()+
+  scale_y_continuous(breaks = scales::pretty_breaks(n = 10), name = "Number of claims",
+                     expand = c(0, 0), limits = c(0, NA))+
+  scale_x_date(date_breaks = "1 year", date_minor_breaks = "1 month", labels = scales::label_date_short())+
+  theme_light()+
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
+  ggtitle("Number of successful claims by month and year")
+
+```
+
+out of curiosity i wonder how the median payment amount has changed over time
+```{r}
+ggplot(mega_data_summary, aes(x = floor_date, y = payment_amount_median)) +
+  geom_line()+
+  scale_y_continuous(breaks = scales::pretty_breaks(n = 10), name = "Number of claims",
+                     expand = c(0, 0), limits = c(0, NA))+
+  scale_x_date(date_breaks = "1 year", date_minor_breaks = "1 month", labels = scales::label_date_short())+
+  theme_light()+
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
+  ggtitle("Number of successful claims by month and year")
+
+ggplot(mega_data_summary, aes(x = floor_date, y = payment_amount_median)) +
+  geom_point()+
+  geom_smooth()+
+  scale_y_continuous(breaks = scales::pretty_breaks(n = 10), name = "Number of claims",
+                     expand = c(0, 0), limits = c(0, NA))+
+  scale_x_date(date_breaks = "1 year", date_minor_breaks = "1 month", labels = scales::label_date_short())+
+  theme_light()+
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
+  ggtitle("Number of successful claims by month and year")
+```
+Those 2025 spikes must be the child seperation payments
+
+im addicted, lets do the monthly totals over time
+```{r}
+ggplot(mega_data_summary, aes(x = floor_date, y = payment_amount_sum)) +
+  geom_line()+
+  scale_y_continuous(breaks = scales::pretty_breaks(n = 10), name = "Number of claims",
+                     expand = c(0, 0), limits = c(0, NA))+
+  scale_x_date(date_breaks = "1 year", date_minor_breaks = "1 month", labels = scales::label_date_short())+
+  theme_light()+
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
+  ggtitle("Number of successful claims by month and year")
+
+ggplot(mega_data_summary, aes(x = floor_date, y = payment_amount_sum)) +
+  geom_point()+
+  geom_smooth()+
+  scale_y_continuous(breaks = scales::pretty_breaks(n = 10), name = "Number of claims",
+                     expand = c(0, 0), limits = c(0, NA))+
+  scale_x_date(date_breaks = "1 year", date_minor_breaks = "1 month", labels = scales::label_date_short())+
+  theme_light()+
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
+  ggtitle("Number of successful claims by month and year")
+```
+huh, that last spike is interesting... lets zoom in by narrowing our data to the past 5 years
+```{r}
+mega_data_summary |>
+  filter(floor_date > ymd("2020-01-01"))|>
+  ggplot(aes(x = floor_date, y = payment_amount_sum)) +
+    geom_line()+
+    scale_y_continuous(breaks = scales::pretty_breaks(n = 10), name = "Number of claims",
+                       expand = c(0, 0), limits = c(0, NA))+
+    scale_x_date(date_breaks = "1 year", date_minor_breaks = "1 month")
+    theme_light()+
+    ggtitle("Number of successful claims by month and year")
+
+    #this plot needs some more work to make it pretty but for now its interesteing
+```
+playing around:all payments, color coded by kind
+```{r}
+mega_data |>
+  filter(payment_sent_date> ymd("2016-01-01"))|>
+  ggplot(aes(x = payment_sent_date, y = payment_amount, color = principle_citation_code)) +
+    geom_point()+
+    scale_y_continuous(breaks = scales::pretty_breaks(n = 10), name = "Number of claims",
+                       expand = c(0, 0), limits = c(0, NA))+
+    scale_x_date(date_breaks = "1 year", date_minor_breaks = "1 month", labels = scales::label_date_short())+
+    theme_light()
+#needs work to look better; ideally would also add new column to megadata that consolidates all false arrests, etc. will come back to it
+```
+
+```{r}
+mega_data_summary |>
+  filter(floor_date > ymd("2016-01-01"))|>
+    ggplot(aes(x = floor_date))+
+    geom_point(aes(y = count_citation_code_traffic, color = "red"))+
+    geom_point(aes(y = count_citation_code_flsarrest, color = "orange"))+
+    geom_point(aes(y = count_citation_code_med_mal, color = "yellow"))+
+    geom_point(aes(y = count_citation_code_propmaint, color = "green"))+
+    geom_point(aes(y = count_citation_code_propseize, color = "blue"))+
+    geom_point(aes(y = count_citation_code_miscellany, color = "purple"))+ #im excluding aircrash here
+    scale_y_continuous(breaks = scales::pretty_breaks(n = 10), name = "Number of claims", expand = c(0, 0), limits = c(0, NA))+
+    scale_x_date(date_breaks = "1 year", date_minor_breaks = "1 month", labels = scales::label_date_short())+
+    theme_light()
+#this is fine but not great. Needs work to remove bottom layer of zeros and fix label on the side
+```
+lets add a smooth line
+```{r}
+mega_data_summary |>
+  filter(floor_date > ymd("2016-01-01"))|>
+    ggplot(aes(x = floor_date))+
+    geom_point(aes(y = count_citation_code_traffic, color = "red"))+
+    geom_smooth(aes(y=count_citation_code_traffic))+
+    geom_point(aes(y = count_citation_code_flsarrest, color = "orange"))+
+    geom_smooth(aes(y=count_citation_code_flsarrest))+
+    geom_point(aes(y = count_citation_code_med_mal, color = "yellow"))+
+    geom_smooth(aes(y=count_citation_code_med_mal))+
+    geom_point(aes(y = count_citation_code_propmaint, color = "green"))+
+    geom_smooth(aes(y=count_citation_code_propmaint))+
+    geom_point(aes(y = count_citation_code_propseize, color = "blue"))+
+    geom_smooth(aes(y=count_citation_code_propseize))+
+    geom_point(aes(y = count_citation_code_miscellany, color = "purple"))+ #im excluding aircrash here
+    geom_smooth(aes(y = count_citation_code_miscellany))+ #im excluding aircrash here
+    scale_y_continuous(breaks = scales::pretty_breaks(n = 10), name = "Number of claims", expand = c(0, 0), limits = c(0, NA))+
+    scale_x_date(date_breaks = "1 year", date_minor_breaks = "1 month", labels = scales::label_date_short())+
+    theme_light()
+```
+uhhh thats not great. but would make more sense with the money amounts perhaps?
+
+```{r}
+mega_data_summary |>
+  filter(floor_date > ymd("2016-01-01"))|>
+  mutate(across(where(is.numeric), na_if, 0))|> #remove zero values bcs our goal is to
+    ggplot(aes(x = floor_date))+
+    geom_point(aes(y = payment_sum_citation_code_traffic, color = "red"))+
+    geom_point(aes(y = payment_sum_citation_code_flsarrest, color = "orange"))+
+    geom_point(aes(y = payment_sum_citation_code_med_mal, color = "yellow"))+
+    geom_point(aes(y = payment_sum_citation_code_propmaint, color = "green"))+
+    geom_point(aes(y = payment_sum_citation_code_propseize, color = "blue"))+
+    geom_point(aes(y = payment_sum_citation_code_miscellany, color = "purple"))+ #im excluding aircrash here
+    scale_y_continuous(breaks = scales::pretty_breaks(n = 10), name = "Amount paid out per month", expand = c(0, 0), limits = c(0, NA))+
+    scale_x_date(date_breaks = "1 year", date_minor_breaks = "1 month", labels = scales::label_date_short())+
+    theme_light()
+
+#this is pretty bad, too... but what are we even going for here? what would be interesting? i dont think this is a worthwile direction
+```
+stead, lets maybe do a facet wrapped line graph of case numbers over time. That way we can actually see what's going on (everything is on its own graph) but we also can compare stuff
 
 Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Cmd+Option+I*.
 
