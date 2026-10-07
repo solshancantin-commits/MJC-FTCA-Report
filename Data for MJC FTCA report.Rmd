@@ -1,0 +1,539 @@
+---
+title: "Data for MJC FTCA report"
+output:
+  html_document:
+    df_print: paged
+---
+<h2>libraries</h2>
+
+```{r}
+library(tidyverse)
+library(dplyr)
+library(readxl)
+library(writexl)
+library(ggplot2)
+library(zoo)
+```
+
+<h2>importing</h2>
+first step is to combine the complete set of data from 09/30/2009 — 09/30/2025 (found https://fiscaldata.treasury.gov/datasets/judgment-fund-report-to-congress/judgment-fund-annual-report-to-congress)
+with the incomplete data from 09-30-25 to date
+
+importing the 09/30/2009 — 09/30/2025 dataset
+```{r}
+data_from_09.30.2009_to_09.30.2025 <- read_csv("JudgFundRprtCongress.csv")
+#parsing issues bcs some values are "null" and thus not expected character type
+```
+importing the incomplete data from 10/1/25- 08/31/26, from
+https://fiscalcrm.my.site.com/jfpaymentsearch/s/
+
+NB: in order to download this data you have to select certain 'search fields' (ie departments) which is unforunately inconsistent with
+my effort to do all the filtering in the same place (here). 
+It also produces 2 files, 1 for claims resolved through litigation and 1 for claims resolved administratively 
+
+```{r}
+admin_data_from_10.1.2025_to_08.31.2026 <- read_csv("JFPaymentAdministrativeReport_09-24-2026_122851.csv")
+ligi_data_from_10.1.2025_to_08.31.2026 <- read_csv("JFPaymentLitigativeReport_09-24-2026_122844.csv")
+```
+
+<h2>combining</h2>
+okay now we have to reconcile these data sets into one giant data set. 
+
+the first step is making sure the variables of each data set match. 
+Im changing the variable names to be more usable as well. In principle, I'm mostly changing the incomplete datasets to match the complete set, except that im changing 'confirmed payment amount' to be 'payment amount' in both since some are implicitly not confirmed, and that I use this step to filter out the variable 'record date' which seems meaningless and confusing since it has little relationship with the date on which the payment was made, nor does it seem to be the date on which the lawsuit was filed. see  the judgement fund dataset dictionary for more
+
+```{r}
+data_from_09.30.2009_to_09.30.2025 <- data_from_09.30.2009_to_09.30.2025 |>
+  select(judgment_type_code = `Judgment Type Code`, 
+         defendent_agency_name = `Defendant Agency Name`,
+         submitting_agency_name = `Submitting Agency Name`,
+         control_number = `Control Number`,
+         plaintiffs_counsel_name = `Plaintiffs Counsel Name`,
+         payment_id_number = `Payment ID Number`,
+         payment_sent_date = `Payment Sent Date`,
+         payment_amount = `Confirmed Payment Amount`,
+         principle_amount = `Principal Amount`,
+         principle_citation_code = `Principal Citation Code`,
+         principle_citation_code_description = `Principal Citation Code Description`,
+         attorneys_fee_amount = `Attorneys Fee Amount`,
+         attorneys_fee_citation_code = `Attorneys Fee Citation Code`,
+         attorneys_fee_citation_code_description = `Attorneys Fee Citation Code Description`,
+         cost_amount = `Cost Amount`,
+         cost_citation_code = `Cost Citation Code`,
+         cost_citation_code_description = `Cost Citation Code Description`,
+         interest_amount = `Interest Amount`,
+         interest_citation_code = `Interest Citation Code`,
+         interest_citation_code_description = `Interest Citation Code Description`,
+         source_line_number = `Source Line Number`
+         )|>
+  filter(payment_id_number!="null")|>
+  mutate(payment_id_number = as.numeric(payment_id_number))
+  
+
+admin_data_from_10.1.2025_to_08.31.2026 <- admin_data_from_10.1.2025_to_08.31.2026 |>
+  select(defendent_agency_name = `Defendant Agency Name`,
+    control_number = `Control #`,
+    payment_id_number = `Payment ID #`,
+    payment_sent_date = `Payment Sent Date`,
+    principle_amount = `Principal Amount`,
+    principle_citation_code = `Principal Citation Code`,
+    principle_citation_code_description = `Principal Citation Code Description`,
+    attorneys_fee_amount = `Attorney Fees Amount`,
+    attorneys_fee_citation_code = `Attorney Fees Citation Code`,
+    attorneys_fee_citation_code_description = `Attorney Fees Citation Code Description`,
+    cost_amount = `Cost Amount`,
+    cost_citation_code = `Cost Citation Code`,
+    cost_citation_code_description = `Cost Citation Code Description`,
+    interest_amount = `Interest Amount`,
+    interest_citation_code = `Interest Citation Code`,
+    interest_citation_code_description = `Interest Citation Code Description`,
+    payment_amount = `Payment Amount`) |>
+  add_column(judgment_type_code = "Administrative")|>
+  filter(payment_id_number!="null")
+    
+liti_data_from_10.1.2025_to_08.31.2026 <- ligi_data_from_10.1.2025_to_08.31.2026 |>
+  select(defendent_agency_name = `Defendant Agency Name`,
+    control_number = `Control #`,
+    payment_id_number = `Payment ID #`,
+    payment_sent_date = `Payment Sent Date`,
+    principle_amount = `Principal Amount`,
+    principle_citation_code = `Principal Citation Code`,
+    principle_citation_code_description = `Principal Citation Code Description`,
+    attorneys_fee_amount = `Attorney Fees Amount`,
+    attorneys_fee_citation_code = `Attorney Fees Citation Code`,
+    attorneys_fee_citation_code_description = `Attorney Fees Citation Code Description`,
+    cost_amount = `Cost Amount`,
+    cost_citation_code = `Cost Citation Code`,
+    cost_citation_code_description = `Cost Citation Code Description`,
+    interest_amount = `Interest Amount`,
+    interest_citation_code = `Interest Citation Code`,
+    interest_citation_code_description = `Interest Citation Code Description`,
+    payment_amount = `Payment Amount`)|>
+  add_column(judgment_type_code = "Litigative")|>
+  filter(payment_id_number!="null")
+
+```
+
+combining the data sets into one big data set
+
+```{r}
+mega_data<-bind_rows(data_from_09.30.2009_to_09.30.2025, liti_data_from_10.1.2025_to_08.31.2026, admin_data_from_10.1.2025_to_08.31.2026)
+```
+
+
+<h2>filtering</h2>
+now we have to filter the data to get what's relevant
+
+```{r}
+mega_data<-mega_data|>
+  #first we filter just to claims against dhs... sort of. It's all claims against dhs (that i recognized) minus, for now, those that mention the coast guard but not dhs explicitly
+  #update on above... 10/7/26 I am removing those which seem explicitly irrelevant, per instructions of my boss
+  filter(defendent_agency_name %in% c("Coast Guard at DHS",
+                                      "Customs and Border Protection",
+                                      "DHS - Federal Protection Service",
+                                      "DHS - Immigration  & Customs Enforcement (ICE)",
+                                      "DHS - TSA  Trans. SEC. Admin.",
+                                      "Homeland Security",
+                                      "Homeland Security; DHS - Immigration  & Customs Enforcement (ICE)",
+                                      "Immigration & Nat",
+                                      #"Secret Service at Homeland Security",
+                                      "Customs and Boarder Protection",
+                                      "DHS - TSA Trans. SEC. Admin.",
+                                      "Customs and Border Protection; Admin for Children and Family; Admin for Children and Family; DHS - Immigration  & Customs Enforcement (ICE); Homeland Security",
+                                      "Customs and Border Protection; DHS - Immigration  & Customs Enforcement (ICE)",
+                                      "Customs and Border Protection; Homeland Security; Admin for Children and Family",
+                                      "Customs and Border Protection; Homeland Security; DHS - Immigration  & Customs Enforcement (ICE); Department of Health and Human Services; Citizen & Immig Svc (USCIS)",
+                                      #"Customs and Border Protection; Marketing and Regulatory Programs B",
+                                      "DHS - Immigration  & Customs Enforcement (ICE); DHS - Immigration  & Customs Enforcement (ICE)",
+                                      #"FLETC at Homeland Security",
+                                      #"General Services Administration; DHS - Immigration  & Customs Enforcement (ICE)",
+                                      "Customs and Border Protection; Immigration & Custom; Internal Revenue Service/S&E",
+                                      "Immigration & Custom",
+                                      "DHS - Office of the Inspector General",
+                                      #"Citizen & Immig Svc (USCIS); Department of State",
+                                      #"Customs and Border Protection; Marshals Service",
+                                      "DHS-Immigration Sevc",
+                                      #"Drug Enforcement Adm; Fed Bureau of Invest; Natl Guard Bureau; Natl Park Service; Secret Service at Homeland Security",
+                                      "Citizen & Immig Svc (USCIS); Homeland Security",
+                                      "Customs and Border Protection; Internal Revenue Service/S&E",
+                                      "DHS-Operations CG",
+                                      "Alcohol Tobacco Fire; Bur of Land Mgmt; Customs and Border Protection; Department of Navy; Department of Transportation; DHS - Immigration  & Customs Enforcement (ICE); Drug Enforcement Adm; Environmental Protection Agency; Fed Aviation Admin; Fed Bureau of Invest; Fish & Wildlife Svc; FLETC at Homeland Security; Forest Service; Internal Revenue Service/S&E; Marshals Service; Off of the Inspector General; Office of Personnel Management; Office of the Secretary of Defense - Agencies; Secret Service at Homeland Security" ,
+                                      #"Citizen & Immig Svc",
+                                      "DHS - TSA  Trans. SEC. Admin.; Office of Personnel Management",
+                                      "Ctr for Disease Cont; Def Logistics Agency; Department of Agriculture; Department of Commerce; Department of Housing and Urban Development; Department of Justice; Department of Labor; Department of Navy; Department of the Air Force; Department of the Army; Department of the Interior; Department of Veterans Affairs; Environmental Protection Agency; Fed Aviation Admin; General Services Administration; Homeland Security; National Aeronautics and Space Administration; Small Business Administration; United States Postal Service",
+                                      "Customs and Border Protection; DHS - Immigration  & Customs Enforcement (ICE); DHS - TSA  Trans. SEC. Admin.; Fed Bureau of Invest",
+                                      "DHS - TSA  Trans. SEC. Admin.; Fed Bureau of Invest",
+                                      "Homeland Security; Natl Oceanic & Atmos",
+                                      "DHS - TSA  Trans. SEC. Admin.; Homeland Security",
+                                      "Fed Protect Svc; Homeland Security",
+                                      "Alcohol Tobacco Fire; Customs and Border Protection; Department of Agriculture; Department of Navy; Department of the Interior; Department of Transportation; DHS - Immigration  & Customs Enforcement (ICE); Drug Enforcement Adm; Environmental Protection Agency; Fed Aviation Admin; Fed Bureau of Invest; FLETC at Homeland Security; Internal Revenue Service/S&E; Marshals Service; Off of the Inspector General; Office of Personnel Management; Office of the Secretary of Defense - Agencies; Secret Service at Homeland Security",
+                                      "Customs and Border Protection; Department of Justice",
+                                      "DHS - BDR. and Trans. SEC. HQ",
+                                      #"DHS - Federal Air Marshalls",
+                                      "DHS - Immigration  & Customs Enforcement (ICE); Marshals Service",
+                                      "Homeland Security; Natl Security Agency",
+                                      "Central Intelligence Agency; Def Logistics Agency; Department of Agriculture; Department of Commerce; Department of Energy; Department of Justice; Department of Navy; Department of the Air Force; Department of the Army; Department of the Interior; Department of the Treasury; Department of Transportation; Department of Veterans Affairs; Government Printing Office; Homeland Security; National Aeronautics and Space Administration; Office of the Secretary of Defense - Agencies; U.S. Nuclear Regulatory Commission",
+                                      "Customs and Border Protection; DHS - TSA  Trans. SEC. Admin.; Homeland Security",
+                                      "Department of Commerce; Department of Education; Department of Energy; Department of Health and Human Services; Department of Housing and Urban Development; Department of Justice; Department of Labor; Department of State; Department of the Interior; Department of the Treasury; Department of Transportation; Department of Veterans Affairs; Homeland Security; Office of the Secretary of Defense - Agencies; OMB",
+                                      "Central Intelligence Agency; Def Logistics Agency; Department of Agriculture; Department of Commerce; Department of Energy; Department of Justice; Department of Navy; Department of the Air Force; Department of the Army; Department of the Interior; Department of the Treasury; Department of Transportation; Department of Veterans Affairs; Government Printing Office; Homeland Security; National Aeronautics & Space Admin; Ofc of the Secretary of Defense; U.S. Nuclear Regulatory Commission",
+                                      "Citizen & Immig Svc; DHS-Immig & Customs-ICE",
+                                      #"Coast Guard; Def Logistics Agency; Department of Agriculture; Department of Energy; Department of Navy; Department of the Air Force; Department of the Army; Department of Veterans Affairs; Fed Aviation Admin; FLETC at DHS; Marine Corps; Natl Guard Bureau; US Army Corps of Engineers",
+                                      #"Coast Guard; Department of Agriculture; Department of Navy; Department of the Air Force; Department of the Army; Department of Veterans Affairs; Fed Aviation Admin; FLETC at DHS; Marine Corps; Natl Guard Bureau; US Army Corps of Engineers",
+                                      "Coast Guard; Department of Navy; Department of the Air Force; Department of the Army; Homeland Security",
+                                      "Customs & Border Pro",
+                                      "Department of Agriculture; Department of Education; Department of Energy; Department of Justice; DHS-Immig & Customs-ICE; FEMA; General Accounting Office; U.S. Nuclear Regulatory Commission",
+                                      "Department of State; Homeland Security",
+                                      "DHS-Immig & Customs-ICE",
+                                      "DHS-TSA Trans SEC Admin",
+                                      "DHS-Federal Protect Svc",
+                                      #"DHS-OIG",
+                                      #"DHS-OIG; Homeland Security",
+                                      #"FEMA at DHS",
+                                      #"FLETC at DHS",
+                                      "Customs and Border Protection; Homeland Security",
+                                      "Department of Justice; Homeland Security",
+                                      "DHS - Federal Protection Service; DHS - Immigration  & Customs Enforcement (ICE)",
+                                      "Customs and Border Protection; DHS - Immigration  & Customs Enforcement (ICE); Fed Bureau of Invest",
+                                      "Department of State; DHS - TSA  Trans. SEC. Admin.; Government Printing Office",
+                                      "Customs and Border Protection; Department of Health and Human Services"
+                                      ))|>
+filter(principle_citation_code %in% c("28-USC-2677 Traffic",
+                                      "28-USC-2677 Miscellany",
+                                      "28 USC 1346(b) Fls-Arrest",
+                                      "28-USC-2677 Fls-Arrest",
+                                      "28-USC-2677 Med Mal",
+                                      "28 USC 1346(b) Prop-Maint",
+                                      "28-USC-2672 Miscellany",
+                                      "28-USC-2672 Traffic",
+                                      "28-USC-2672 Prop-Maint",
+                                      "28 USC 1346(b) Traffic",
+                                      "28-USC-2677 Prop-Maint",
+                                      "28-USC-2672  Fire-Flood",
+                                      "28-USC-2672 Prop-Seize",
+                                      "28-USC-2672 Fls-Arrest",
+                                      "28 USC 1346(b) Prop-Seize",
+                                      "28-USC-2677 Prop-Seize",
+                                      "28 USC 1346(b) Miscellany",
+                                      "28-USC-2672 Med Mal",
+                                      "28-USC-2672 Aircrash"
+                                      ))
+#version using citation code description:
+# filter(principle_citation_code_description %in% c("Federal Tort Claims Act/Settlement/Traffic",
+#                                                     "Federal Tort Claims Act/Settlement/Fls-Arrest",
+#                                                     "Federal Tort Claims Act/Settlement/Miscellany",
+#                                                     "Federal Tort Claims Act/Court Judgment/Miscellany",
+#                                                     "Federal Tort Claims Act/Settlement/Fire-Flood",
+#                                                     "Federal Tort Claims Act/Settlement/Prop-Maint",
+#                                                     "Federal Tort Claims Act/Settlement/Med Mal",
+#                                                     "Federal Tort Claims Act/Court Judgment/Fls-Arrest",
+#                                                     "Federal Tort Claims Act/Admin/Traffic",
+#                                                     "Federal Tort Claims Act/Settlement/Camp Lejeune Justice Act 2022 (CLJA)",
+#                                                     "Federal Tort Claims Act/Court Judgment/Med Mal",
+#                                                     "Federal Tort Claims Act/Court Judgment/Prop-Maint",
+#                                                     "Federal Tort Claims Act/Court Judgment/Prop-Seize",
+#                                                     "Federal Tort Claims Act/Admin/Miscellany",
+#                                                     "Federal Tort Claims Act/Admin/Prop-Maint",
+#                                                     "Federal Tort Claims Act/Admin/Fire-Flood",
+#                                                     "Federal Tort Claims Act/Admin/Med Mal",
+#                                                     "Federal Tort Claims AcAircrasht/Admin/Aircrash",
+#                                                     "Federal Tort Claims Act/Admin/Camp Lejeune Justice Act 2022 (CLJA)",
+#                                                     "Water/CLJA Federal Tort Claims Act/Admin/Camp Lejeune Act 2022 (CLJA)" ,
+#                                                     "Federal Tort Claims Act/Admin/Prop-Seize",
+#                                                     "Federal Tort Claims Act/Admin/Fls-Arrest",
+#                                                     "Federal Tort Claims Act/Court Judgment/Aircrash",
+#                                                     "Federal Tort Claims Act/Court/Fire-Flood"
+#                                                     ))
+
+  
+```
+
+
+<h2>mutating</h2>
+
+lets mutate mega_data to add a column floor_date that marks the first day of the month that a claim was paid out. This will allow us-hopefully- to create graphs that count the number of claims in a given month in a given year. It's not the most elegant solution but its the only one I could find.  
+```{r}
+mega_data<-mega_data |>
+  mutate(
+    floor_date = floor_date(payment_sent_date, "month")
+  )
+```
+
+Lets mutate again to add another new variable: citation_cause. This will be a simplified version of principle_citation_code, containing the information about the 'why' of the payment (eg med_mal or prop_seize) but not the how (admin or through the courts). The latter information is (with slightly less specificity) already contained in judgement_type_code_anyway
+
+```{r}
+mega_data <- mega_data |>
+  mutate(
+    citation_cause = case_when(
+      principle_citation_code %in% c("28-USC-2677 Traffic","28-USC-2672 Traffic","28 USC 1346(b) Traffic") ~ "traffic",
+      principle_citation_code %in% c("28 USC 1346(b) Fls-Arrest","28-USC-2677 Fls-Arrest","28-USC-2672 Fls-Arrest") ~ "fls_arrest",
+      principle_citation_code %in% c("28-USC-2677 Med Mal","28-USC-2672 Med Mal") ~ "med_mal",
+      principle_citation_code %in% c("28 USC 1346(b) Prop-Maint", "28-USC-2672 Prop-Maint","28-USC-2677 Prop-Maint") ~ "prop_maint",
+      principle_citation_code %in% c("28-USC-2672  Fire-Flood") ~ "fire_flood",
+      principle_citation_code %in% c("28-USC-2672 Prop-Seize", "28 USC 1346(b) Prop-Seize", "28-USC-2677 Prop-Seize") ~ "prop_seize",
+      principle_citation_code %in% c("28-USC-2677 Miscellany", "28-USC-2672 Miscellany","28 USC 1346(b) Miscellany") ~ "miscellany",
+      principle_citation_code %in% c("28-USC-2672 Aircrash") ~ "aircrash"
+     )
+  )
+```
+
+<h2>summary statistics</h2>
+Now we create 3 new 'summary' dataframes where we can store some of our summary statistics. The first just stores information about payments made each month; the second further subdivides by citation_cause
+```{r}
+mega_data_summary <- mega_data%>%
+  group_by(floor_date) %>%
+    summarize(count = n_distinct(payment_id_number), 
+              payment_amount_sum = sum(payment_amount), 
+              payment_amount_median = median(payment_amount)
+    )
+
+mega_data_summary_by_citation_cause <- mega_data|>
+  group_by(floor_date, citation_cause)|>
+  summarize(count = n_distinct(payment_id_number), 
+              payment_amount_sum = sum(payment_amount), 
+              payment_amount_median = median(payment_amount))
+```
+
+
+<h2>graphing</h2>
+
+now let's try to create some line graphs tracking changes in each of these  statistics over time
+```{r}
+#count of claims paid each month over time
+
+ggplot(mega_data_summary, aes(x = floor_date, y = count)) +
+  geom_line()+
+  scale_y_continuous(breaks = scales::pretty_breaks(n = 10), name = "Number of claims",
+                     expand = c(0, 0), limits = c(0, NA))+
+  scale_x_date(date_breaks = "1 year", date_minor_breaks = "1 month", labels = scales::label_date_short())+
+  theme_light()+
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
+  ggtitle("Number of successful claims each month")
+
+#alternative look
+ggplot(mega_data_summary, aes(x = floor_date, y = count)) +
+  geom_point()+
+  geom_smooth()+
+  scale_y_continuous(breaks = scales::pretty_breaks(n = 10), name = "Number of claims",
+                     expand = c(0, 0), limits = c(0, NA))+
+  scale_x_date(date_breaks = "1 year", date_minor_breaks = "1 month", labels = scales::label_date_short(), name = "Year")+
+  theme_light()+
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
+  ggtitle("Number of successful claims each month")
+
+```
+
+out of curiosity i wonder how the median payment amount has changed over time
+```{r}
+ggplot(mega_data_summary, aes(x = floor_date, y = payment_amount_median)) +
+  geom_line()+
+  scale_y_continuous(breaks = scales::pretty_breaks(n = 10), name = "Median payment amount",
+                     expand = c(0, 0), limits = c(0, NA), labels = scales::label_dollar())+
+  scale_x_date(date_breaks = "1 year", date_minor_breaks = "1 month", labels = scales::label_date_short())+
+  theme_light()+
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
+  ggtitle("Median payment amount per claim by month and year")
+
+ggplot(mega_data_summary, aes(x = floor_date, y = payment_amount_median)) +
+  geom_point()+
+  geom_smooth()+
+  scale_y_continuous(breaks = scales::pretty_breaks(n = 10), name = "Median payment amount",
+                     expand = c(0, 0), limits = c(0, NA), labels = scales::label_dollar())+
+  scale_x_date(date_breaks = "1 year", date_minor_breaks = "1 month", labels = scales::label_date_short())+
+  theme_light()+
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
+  ggtitle("Median payment amount per claim by month and year")
+```
+Those 2025 spikes must be the child seperation payments
+
+im addicted, lets do the monthly totals over time
+```{r}
+ggplot(mega_data_summary, aes(x = floor_date, y = payment_amount_sum)) +
+  geom_line()+
+  scale_y_continuous(breaks = scales::pretty_breaks(n = 10), name = "Dollars",
+                     expand = c(0, 0), limits = c(0, NA), labels = scales::label_dollar())+
+  scale_x_date(date_breaks = "1 year", date_minor_breaks = "1 month", labels = scales::label_date_short(), name = "Date")+
+  theme_light()+
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
+  ggtitle("Total amount of money paid out each month")
+
+ggplot(mega_data_summary, aes(x = floor_date, y = payment_amount_sum)) +
+  geom_point()+
+  geom_smooth()+
+  scale_y_continuous(breaks = scales::pretty_breaks(n = 10), name = "Dollars",
+                     expand = c(0, 0), limits = c(0, NA), labels = scales::label_dollar())+
+  scale_x_date(date_breaks = "1 year", date_minor_breaks = "1 month", labels = scales::label_date_short(), name = "Date")+
+  theme_light()+
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
+  ggtitle("Total amount of money paid out each month")
+
+ggplot(mega_data_summary, aes(x = floor_date, y = payment_amount_sum)) +
+  geom_col()+
+  scale_y_continuous(breaks = scales::pretty_breaks(n = 10), name = "Dollars",
+                     expand = c(0, 0), limits = c(0, NA), labels = scales::label_dollar())+
+  scale_x_date(date_breaks = "1 year", date_minor_breaks = "1 month", labels = scales::label_date_short(), name = "Date")+
+  theme_light()+
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
+  ggtitle("Total amount of money paid out each month")
+```
+huh, that last spike is interesting... lets zoom in by narrowing our data to the past 5 years
+```{r}
+mega_data_summary |>
+  filter(floor_date > ymd("2020-01-01"))|>
+  ggplot(aes(x = floor_date, y = payment_amount_sum)) +
+    geom_line()+
+    scale_y_continuous(breaks = scales::pretty_breaks(n = 10), name = "Dollars",
+                       expand = c(0, 0), limits = c(0, NA), labels = scales::label_dollar())+
+    scale_x_date(date_breaks = "1 year", date_minor_breaks = "1 month", name = "year")+
+    theme_light()
+
+    #this plot needs some more work to make it pretty but for now its interesteing
+```
+playing around:all payments, color coded by kind
+```{r}
+mega_data |>
+  filter(payment_sent_date> ymd("2016-01-01"))|>
+  ggplot(aes(x = payment_sent_date, y = payment_amount, color = citation_cause)) +
+    geom_point()+
+    scale_y_continuous(breaks = scales::pretty_breaks(n = 10), name = "claim payment amounts",
+                       expand = c(0, 0), limits = c(0, NA), labels = scales::label_dollar())+
+    scale_x_date(date_breaks = "1 year", date_minor_breaks = "1 month", labels = scales::label_date_short())+
+    theme_light()
+#needs work to look better; will come back to it
+```
+lets play around with our second summary stastic table and group some stuff by kind
+```{r}
+#line graph of number of claims per month over time, color = citation cause
+mega_data_summary_by_citation_cause |>
+  filter(floor_date > ymd("2016-01-01"))|>
+    ggplot(aes(x = floor_date, y = count, color = citation_cause))+
+    geom_line()+
+    scale_y_continuous(breaks = scales::pretty_breaks(n = 10), name = "Number of claims")+
+    scale_x_date(date_breaks = "1 year", date_minor_breaks = "1 month", labels = scales::label_date_short(), name = "Month")+
+    theme_light()
+
+#bar graph of number of claims per month over time, color = citation cause
+mega_data_summary_by_citation_cause |>
+  filter(floor_date > ymd("2016-01-01"))|>
+    ggplot(aes(x = floor_date, y = count, color = citation_cause, fill = citation_cause))+
+    geom_col()+
+    scale_y_continuous(breaks = scales::pretty_breaks(n = 10), name = "Number of claims")+
+    scale_x_date(date_breaks = "1 year", date_minor_breaks = "1 month", labels = scales::label_date_short(), name = "Month")+
+    theme_light()
+
+#bar chart of payment amounts by year and citation cause
+mega_data_summary_by_citation_cause |>
+  filter(floor_date > ymd("2016-01-01"))|>
+    ggplot(aes(x = floor_date, y = payment_amount_sum, color = citation_cause, fill = citation_cause))+
+    geom_col()+
+    scale_y_continuous(breaks = scales::pretty_breaks(n = 10), name = "Amount paid", label = scales::label_dollar())+
+    scale_x_date(date_breaks = "1 year", date_minor_breaks = "1 month", labels = scales::label_date_short(), name = "Month")+
+    theme_light()
+#come back and do y axis as money
+```
+
+some attempts at visualizing payment amounts by citation cause- this info is, or may be, of some practical value to lawyers seeking to sue through the ftca, so I want it to be legible
+```{r}
+# #facet wrapped histogram 
+# ggplot(mega_data, aes(x=payment_amount, fill=citation_cause))+
+#   geom_histogram()+
+#   scale_x_log10(labels = scales::label_dollar(), name = "payment amount") + #i had to scale the x axis by log in order to make anything at all visible, but it wasn't what i had in mind and i would rather not have
+#   facet_wrap(~citation_cause, scales = "free_y", ncol=1)
+# #this is pretty good but rstudio is making it tiny and squished for some reason
+# 
+# #layered transparent density plots
+# ggplot(mega_data, aes(x = payment_amount, color = citation_cause, fill = citation_cause)) +
+#   scale_x_log10(labels = scales::label_dollar()) + 
+#   geom_density(alpha = 0.5)
+# #this is pretty but close to useless
+
+#maybe the solution is a facet wrapped density plot?
+# i ended up liking this the best so I'm reducing it to just the past 10 years, getting rid of the empty 'aircrash' cause, and adding some visual elements
+mega_data|>
+  filter(floor_date > ymd("2016-01-01"), citation_cause!="aircrash")|>
+  ggplot(aes(x=payment_amount, fill=citation_cause))+
+    geom_density()+
+    scale_x_log10(labels = scales::label_dollar(), breaks = scales::breaks_log(n = 8), name = "Payment") + #i had to scale the x axis by log in order to make anything at all visible, but it wasn't what i had in mind and i would rather not have
+    facet_wrap(~citation_cause, scales = "free_y", ncol=1)+
+    scale_y_continuous(breaks = scales::pretty_breaks(n = 2), name = "Density", expand = c(0, 0), limits = c(0, NA))+
+    theme_light()
+
+#an alternative without the log scale x axis and in fact without a shared x axis at all
+mega_data|>
+  filter(floor_date > ymd("2016-01-01"), citation_cause!="aircrash")|>
+  ggplot(aes(x=payment_amount, fill=citation_cause))+
+    geom_histogram()+ # i switched to a histogram and it made me realize the density plot might be misleading...
+    facet_wrap(~citation_cause, scales = "free", ncol=1)+ #scales are free bcs otherwise things are too different
+    scale_x_continuous(breaks = scales::pretty_breaks(n = 4), name = "Payment amount", expand = c(0, 0), limits = c(0, NA), labels = scales::label_dollar())+
+    scale_y_continuous(breaks = scales::pretty_breaks(n = 2), name = "Density", expand = c(0, 0), limits = c(0, NA))+
+    theme_light()
+
+#needs thought about histogram v density, work to fix squishing and legend, add title, etc. aesthetically
+```
+I think the reason that the histograms are so split might be because we're looking at both litigative and administrative payments.lets split those up.
+
+```{r}
+mega_data|>
+  filter(floor_date > ymd("2016-01-01"), citation_cause!="aircrash", judgment_type_code=="Litigative")|>
+  ggplot(aes(x=payment_amount, fill=citation_cause))+
+    geom_histogram()+
+    #scale_x_log10(labels = scales::label_dollar(), breaks = scales::breaks_log(n = 8), name = "Payment") + #i had to scale the x axis by log in order to make anything at all visible, but it wasn't what i had in mind and i would rather not have
+    facet_wrap(~citation_cause, scales = "free_y")+
+    scale_y_continuous(breaks = scales::pretty_breaks(n = 2), name = "Density")+
+    theme_light()
+
+mega_data|>
+  filter(floor_date > ymd("2016-01-01"), citation_cause!="aircrash", judgment_type_code=="Administrative")|>
+  ggplot(aes(x=payment_amount, fill=citation_cause))+
+    geom_histogram()+
+    #scale_x_log10(labels = scales::label_dollar(), breaks = scales::breaks_log(n = 8), name = "Payment") + #i had to scale the x axis by log in order to make anything at all visible, but it wasn't what i had in mind and i would rather not have
+    facet_wrap(~citation_cause, scales = "free_y")+
+    scale_y_continuous(breaks = scales::pretty_breaks(n = 2), name = "Density")+
+    theme_light()
+
+#this is getting frustrating... i dont know why the axes are so huge when ostensibly there is no data on the upper ends. argh. Needs more work
+```
+
+
+Now I want to try represnting this in a very different way
+```{r}
+mega_data|>
+  filter(floor_date > ymd("2016-01-01"), citation_cause!="aircrash", citation_cause!="fire_flood")|> 
+  #sorry to aircrash and fire flood but they're not what we're the most interested in anyway and there arent that many examples in our timeframe
+  ggplot(aes(x = citation_cause, y=payment_amount))+
+  geom_jitter(alpha = 0.4, aes(color = citation_cause)) +
+  geom_boxplot(alpha = 0) +
+  facet_wrap(~judgment_type_code, scales = "fixed")+
+  scale_y_log10(labels = scales::label_dollar(), breaks = scales::breaks_log(n = 15), name = "Payment")+
+  theme_light()
+
+#needs some work on legend etc but i think pretty good
+```
+
+
+
+TO DO:
+
+
+- scatter plot with jitter and alpha, x axis is citation code, y axis is payment amount, boxplot/violin plot superimposed [done]
+
+- admin vs judicially awarded over time
+
+- create codebook
+
+- stacked bar by year and citation cause,[done]
+
+- fix histograms
+
+- filled bar payment amount over time color = citation code
+
+- 
+
+-> one of the big stories here is that the stuff they're describing as traffic and misc cannot possibly be
+
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Cmd+Option+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Cmd+Shift+K* to preview the HTML file). 
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
+
