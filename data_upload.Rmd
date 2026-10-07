@@ -290,8 +290,8 @@ mega_data_summary <- mega_data%>%
               payment_sum_citation_code_prop_maint = sum(payment_amount[citation_cause == "prop_maint"]),
               payment_sum_citation_code_fire_flood = sum(payment_amount[citation_cause == "fire_flood"]),
               payment_sum_citation_code_prop_seize = sum(payment_amount[citation_cause == "prop_seize"]),
-              payment_sum_citation_code_fls_arrest = sum(payment_amount[citation_cause == "miscellany"]),
-              payment_sum_citation_code_fls_arrest = sum(payment_amount[citation_cause == "aircrash"])
+              payment_sum_citation_code_miscellany = sum(payment_amount[citation_cause == "miscellany"]),
+              payment_sum_citation_code_aircrasht = sum(payment_amount[citation_cause == "aircrash"])
     )
 
 ```
@@ -437,13 +437,13 @@ mega_data_summary |>
   mutate(across(where(is.numeric), na_if, 0))|> #remove zero values bcs our goal is to
     ggplot(aes(x = floor_date))+
     geom_point(aes(y = payment_sum_citation_code_traffic, color = "red"))+
-    geom_point(aes(y = payment_sum_citation_code_flsarrest, color = "orange"))+
+    geom_point(aes(y = payment_sum_citation_code_fls_arrest, color = "orange"))+
     geom_point(aes(y = payment_sum_citation_code_med_mal, color = "yellow"))+
-    geom_point(aes(y = payment_sum_citation_code_propmaint, color = "green"))+
-    geom_point(aes(y = payment_sum_citation_code_propseize, color = "blue"))+
+    geom_point(aes(y = payment_sum_citation_code_prop_maint, color = "green"))+
+    geom_point(aes(y = payment_sum_citation_code_prop_seize, color = "blue"))+
     geom_point(aes(y = payment_sum_citation_code_miscellany, color = "purple"))+ #im excluding aircrash here
-    scale_y_continuous(breaks = scales::pretty_breaks(n = 10), name = "Amount paid out per month", expand = c(0, 0), limits = c(0, NA))+
-    scale_x_date(date_breaks = "1 year", date_minor_breaks = "1 month", labels = scales::label_date_short())+
+    scale_y_continuous(breaks = scales::pretty_breaks(n = 10), name = "Amount paid out per month", expand = c(0, 0), limits = c(0, NA), labels = scales::label_dollar())+
+    scale_x_date(date_breaks = "1 year", date_minor_breaks = "1 month", labels = scales::label_date_short())
 
 #this is pretty bad, too... but what are we even going for here? what would be interesting? i will return to this but not right away
 ```
@@ -485,19 +485,54 @@ mega_data|>
 
 #needs thought about histogram v density, work to fix squishing and legend, add title, etc. aesthetically
 ```
-okay awesome.
+I think the reason that the histograms are so split might be because we're looking at both litigative and administrative payments.lets split those up.
+
+```{r}
+mega_data|>
+  filter(floor_date > ymd("2016-01-01"), citation_cause!="aircrash", judgment_type_code=="Litigative")|>
+  ggplot(aes(x=payment_amount, fill=citation_cause))+
+    geom_histogram()+
+    #scale_x_log10(labels = scales::label_dollar(), breaks = scales::breaks_log(n = 8), name = "Payment") + #i had to scale the x axis by log in order to make anything at all visible, but it wasn't what i had in mind and i would rather not have
+    facet_wrap(~citation_cause, scales = "free_y")+
+    scale_y_continuous(breaks = scales::pretty_breaks(n = 2), name = "Density")+
+    theme_light()
+
+mega_data|>
+  filter(floor_date > ymd("2016-01-01"), citation_cause!="aircrash", judgment_type_code=="Administrative")|>
+  ggplot(aes(x=payment_amount, fill=citation_cause))+
+    geom_histogram()+
+    #scale_x_log10(labels = scales::label_dollar(), breaks = scales::breaks_log(n = 8), name = "Payment") + #i had to scale the x axis by log in order to make anything at all visible, but it wasn't what i had in mind and i would rather not have
+    facet_wrap(~citation_cause, scales = "free_y")+
+    scale_y_continuous(breaks = scales::pretty_breaks(n = 2), name = "Density")+
+    theme_light()
+
+#this is getting frustrating... i dont know why the axes are so huge when ostensibly there is no data on the upper ends. argh. Needs more work
+```
+
+
 Now I want to try represnting this in a very different way
 ```{r}
 mega_data|>
-  filter(floor_date > ymd("2016-01-01"), citation_cause!="aircrash", citation_cause!="fire_flood" )|> 
+  filter(floor_date > ymd("2016-01-01"), citation_cause!="aircrash", citation_cause!="fire_flood")|> 
   #sorry to aircrash and fire flood but they're not what we're the most interested in anyway and there arent that many examples in our timeframe
   ggplot(aes(x = citation_cause, y=payment_amount))+
   geom_jitter(alpha = 0.4, aes(color = citation_cause)) +
   geom_boxplot(alpha = 0) +
+  facet_wrap(~judgment_type_code, scales = "fixed")+
   scale_y_log10(labels = scales::label_dollar(), breaks = scales::breaks_log(n = 15), name = "Payment")+
   theme_light()
 
 #needs some work on legend etc but i think pretty good
+```
+okay, another thing that would be good to have is a stacked boxplot of money per year
+```{r}
+mega_data|>
+  filter(floor_date > ymd("2016-01-01"))|>
+  group_by(floor_date)|>
+  summarize(payment_sum = sum(payment_amount))|>
+  ggplot(aes(x = floor_date, y = payment_sum))+
+  geom_col()
+           
 ```
 
 
@@ -513,6 +548,10 @@ TO DO:
 - create codebook
 
 
+```{r}
+mega_data|>
+  filter()
+```
 
 
 Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Cmd+Option+I*.
