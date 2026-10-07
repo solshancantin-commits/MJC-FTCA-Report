@@ -1,13 +1,9 @@
 ---
-title: "importing"
+title: "ftca"
 output: html_notebook
 ---
+##libraries
 
-This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
-
-Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Cmd+Shift+Enter*. 
-
-libraries
 ```{r}
 library(tidyverse)
 library(dplyr)
@@ -17,7 +13,8 @@ library(ggplot2)
 library(zoo)
 ```
 
-Overall is to combine the complete set of data from 09/30/2009 — 09/30/2025 (found https://fiscaldata.treasury.gov/datasets/judgment-fund-report-to-congress/judgment-fund-annual-report-to-congress)
+##importing
+first step is to combine the complete set of data from 09/30/2009 — 09/30/2025 (found https://fiscaldata.treasury.gov/datasets/judgment-fund-report-to-congress/judgment-fund-annual-report-to-congress)
 with the incomplete data from 09-30-25 to date
 
 importing the 09/30/2009 — 09/30/2025 dataset
@@ -31,10 +28,13 @@ https://fiscalcrm.my.site.com/jfpaymentsearch/s/
 NB: in order to download this data you have to select certain 'search fields' (ie departments) which is unforunately inconsistent with
 my effort to do all the filtering in the same place (here). 
 It also produces 2 files, 1 for claims resolved through litigation and 1 for claims resolved administratively 
+
 ```{r}
 admin_data_from_10.1.2025_to_08.31.2026 <- read_csv("JFPaymentAdministrativeReport_09-24-2026_122851.csv")
 ligi_data_from_10.1.2025_to_08.31.2026 <- read_csv("JFPaymentLitigativeReport_09-24-2026_122844.csv")
 ```
+
+##combining
 okay now we have to reconcile these data sets into one giant data set. 
 
 the first step is making sure the variables of each data set match. 
@@ -118,11 +118,14 @@ combining the data sets into one big data set
 mega_data<-bind_rows(data_from_09.30.2009_to_09.30.2025, liti_data_from_10.1.2025_to_08.31.2026, admin_data_from_10.1.2025_to_08.31.2026)
 ```
 
+
+##filtering
 now we have to filter the data to get what's relevant
 
 ```{r}
 mega_data<-mega_data|>
   #first we filter just to claims against dhs... sort of. It's all claims against dhs (that i recognized) minus, for now, those that mention the coast guard but not dhs explicitly
+  #update on above... 10/7/26 I am removing those which seem explicitly irrelevant, per instructions of my boss
   filter(defendent_agency_name %in% c("Coast Guard at DHS",
                                       "Customs and Border Protection",
                                       "DHS - Federal Protection Service",
@@ -131,29 +134,29 @@ mega_data<-mega_data|>
                                       "Homeland Security",
                                       "Homeland Security; DHS - Immigration  & Customs Enforcement (ICE)",
                                       "Immigration & Nat",
-                                      "Secret Service at Homeland Security",
+                                      #"Secret Service at Homeland Security",
                                       "Customs and Boarder Protection",
                                       "DHS - TSA Trans. SEC. Admin.",
                                       "Customs and Border Protection; Admin for Children and Family; Admin for Children and Family; DHS - Immigration  & Customs Enforcement (ICE); Homeland Security",
                                       "Customs and Border Protection; DHS - Immigration  & Customs Enforcement (ICE)",
                                       "Customs and Border Protection; Homeland Security; Admin for Children and Family",
                                       "Customs and Border Protection; Homeland Security; DHS - Immigration  & Customs Enforcement (ICE); Department of Health and Human Services; Citizen & Immig Svc (USCIS)",
-                                      "Customs and Border Protection; Marketing and Regulatory Programs B",
+                                      #"Customs and Border Protection; Marketing and Regulatory Programs B",
                                       "DHS - Immigration  & Customs Enforcement (ICE); DHS - Immigration  & Customs Enforcement (ICE)",
-                                      "FLETC at Homeland Security",
-                                      "General Services Administration; DHS - Immigration  & Customs Enforcement (ICE)",
+                                      #"FLETC at Homeland Security",
+                                      #"General Services Administration; DHS - Immigration  & Customs Enforcement (ICE)",
                                       "Customs and Border Protection; Immigration & Custom; Internal Revenue Service/S&E",
                                       "Immigration & Custom",
                                       "DHS - Office of the Inspector General",
-                                      "Citizen & Immig Svc (USCIS); Department of State",
-                                      "Customs and Border Protection; Marshals Service",
+                                      #"Citizen & Immig Svc (USCIS); Department of State",
+                                      #"Customs and Border Protection; Marshals Service",
                                       "DHS-Immigration Sevc",
-                                      "Drug Enforcement Adm; Fed Bureau of Invest; Natl Guard Bureau; Natl Park Service; Secret Service at Homeland Security",
+                                      #"Drug Enforcement Adm; Fed Bureau of Invest; Natl Guard Bureau; Natl Park Service; Secret Service at Homeland Security",
                                       "Citizen & Immig Svc (USCIS); Homeland Security",
                                       "Customs and Border Protection; Internal Revenue Service/S&E",
                                       "DHS-Operations CG",
                                       "Alcohol Tobacco Fire; Bur of Land Mgmt; Customs and Border Protection; Department of Navy; Department of Transportation; DHS - Immigration  & Customs Enforcement (ICE); Drug Enforcement Adm; Environmental Protection Agency; Fed Aviation Admin; Fed Bureau of Invest; Fish & Wildlife Svc; FLETC at Homeland Security; Forest Service; Internal Revenue Service/S&E; Marshals Service; Off of the Inspector General; Office of Personnel Management; Office of the Secretary of Defense - Agencies; Secret Service at Homeland Security" ,
-                                      "Citizen & Immig Svc",
+                                      #"Citizen & Immig Svc",
                                       "DHS - TSA  Trans. SEC. Admin.; Office of Personnel Management",
                                       "Ctr for Disease Cont; Def Logistics Agency; Department of Agriculture; Department of Commerce; Department of Housing and Urban Development; Department of Justice; Department of Labor; Department of Navy; Department of the Air Force; Department of the Army; Department of the Interior; Department of Veterans Affairs; Environmental Protection Agency; Fed Aviation Admin; General Services Administration; Homeland Security; National Aeronautics and Space Administration; Small Business Administration; United States Postal Service",
                                       "Customs and Border Protection; DHS - Immigration  & Customs Enforcement (ICE); DHS - TSA  Trans. SEC. Admin.; Fed Bureau of Invest",
@@ -164,7 +167,7 @@ mega_data<-mega_data|>
                                       "Alcohol Tobacco Fire; Customs and Border Protection; Department of Agriculture; Department of Navy; Department of the Interior; Department of Transportation; DHS - Immigration  & Customs Enforcement (ICE); Drug Enforcement Adm; Environmental Protection Agency; Fed Aviation Admin; Fed Bureau of Invest; FLETC at Homeland Security; Internal Revenue Service/S&E; Marshals Service; Off of the Inspector General; Office of Personnel Management; Office of the Secretary of Defense - Agencies; Secret Service at Homeland Security",
                                       "Customs and Border Protection; Department of Justice",
                                       "DHS - BDR. and Trans. SEC. HQ",
-                                      "DHS - Federal Air Marshalls",
+                                      #"DHS - Federal Air Marshalls",
                                       "DHS - Immigration  & Customs Enforcement (ICE); Marshals Service",
                                       "Homeland Security; Natl Security Agency",
                                       "Central Intelligence Agency; Def Logistics Agency; Department of Agriculture; Department of Commerce; Department of Energy; Department of Justice; Department of Navy; Department of the Air Force; Department of the Army; Department of the Interior; Department of the Treasury; Department of Transportation; Department of Veterans Affairs; Government Printing Office; Homeland Security; National Aeronautics and Space Administration; Office of the Secretary of Defense - Agencies; U.S. Nuclear Regulatory Commission",
@@ -172,8 +175,8 @@ mega_data<-mega_data|>
                                       "Department of Commerce; Department of Education; Department of Energy; Department of Health and Human Services; Department of Housing and Urban Development; Department of Justice; Department of Labor; Department of State; Department of the Interior; Department of the Treasury; Department of Transportation; Department of Veterans Affairs; Homeland Security; Office of the Secretary of Defense - Agencies; OMB",
                                       "Central Intelligence Agency; Def Logistics Agency; Department of Agriculture; Department of Commerce; Department of Energy; Department of Justice; Department of Navy; Department of the Air Force; Department of the Army; Department of the Interior; Department of the Treasury; Department of Transportation; Department of Veterans Affairs; Government Printing Office; Homeland Security; National Aeronautics & Space Admin; Ofc of the Secretary of Defense; U.S. Nuclear Regulatory Commission",
                                       "Citizen & Immig Svc; DHS-Immig & Customs-ICE",
-                                      "Coast Guard; Def Logistics Agency; Department of Agriculture; Department of Energy; Department of Navy; Department of the Air Force; Department of the Army; Department of Veterans Affairs; Fed Aviation Admin; FLETC at DHS; Marine Corps; Natl Guard Bureau; US Army Corps of Engineers",
-                                      "Coast Guard; Department of Agriculture; Department of Navy; Department of the Air Force; Department of the Army; Department of Veterans Affairs; Fed Aviation Admin; FLETC at DHS; Marine Corps; Natl Guard Bureau; US Army Corps of Engineers",
+                                      #"Coast Guard; Def Logistics Agency; Department of Agriculture; Department of Energy; Department of Navy; Department of the Air Force; Department of the Army; Department of Veterans Affairs; Fed Aviation Admin; FLETC at DHS; Marine Corps; Natl Guard Bureau; US Army Corps of Engineers",
+                                      #"Coast Guard; Department of Agriculture; Department of Navy; Department of the Air Force; Department of the Army; Department of Veterans Affairs; Fed Aviation Admin; FLETC at DHS; Marine Corps; Natl Guard Bureau; US Army Corps of Engineers",
                                       "Coast Guard; Department of Navy; Department of the Air Force; Department of the Army; Homeland Security",
                                       "Customs & Border Pro",
                                       "Department of Agriculture; Department of Education; Department of Energy; Department of Justice; DHS-Immig & Customs-ICE; FEMA; General Accounting Office; U.S. Nuclear Regulatory Commission",
@@ -181,10 +184,10 @@ mega_data<-mega_data|>
                                       "DHS-Immig & Customs-ICE",
                                       "DHS-TSA Trans SEC Admin",
                                       "DHS-Federal Protect Svc",
-                                      "DHS-OIG",
-                                      "DHS-OIG; Homeland Security",
-                                      "FEMA at DHS",
-                                      "FLETC at DHS",
+                                      #"DHS-OIG",
+                                      #"DHS-OIG; Homeland Security",
+                                      #"FEMA at DHS",
+                                      #"FLETC at DHS",
                                       "Customs and Border Protection; Homeland Security",
                                       "Department of Justice; Homeland Security",
                                       "DHS - Federal Protection Service; DHS - Immigration  & Customs Enforcement (ICE)",
@@ -242,6 +245,9 @@ filter(principle_citation_code %in% c("28-USC-2677 Traffic",
   
 ```
 
+
+## mutating & summarizing
+
 lets mutate mega_data to add a column floor_date that marks the first day of the month that a claim was paid out. This will allow us-hopefully- to create graphs that count the number of claims in a given month in a given year. It's not the most elegant solution but its the only one I could find.  
 ```{r}
 mega_data<-mega_data |>
@@ -251,6 +257,7 @@ mega_data<-mega_data |>
 ```
 
 Lets mutate again to add another new variable: citation_cause. This will be a simplified version of principle_citation_code, containing the information about the 'why' of the payment (eg med_mal or prop_seize) but not the how (admin or through the courts). The latter information is (with slightly less specificity) already contained in judgement_type_code_anyway
+
 ```{r}
 mega_data <- mega_data |>
   mutate(
@@ -267,34 +274,24 @@ mega_data <- mega_data |>
   )
 ```
 
-
-
-Now we create a new 'summary' dataframe where we can store some of our summary statistics
+Now we create 3 new 'summary' dataframes where we can store some of our summary statistics. The first just stores information about payments made each month; the second further subdivides by citation_cause
 ```{r}
 mega_data_summary <- mega_data%>%
   group_by(floor_date) %>%
     summarize(count = n_distinct(payment_id_number), 
               payment_amount_sum = sum(payment_amount), 
-              payment_amount_median = median(payment_amount),
-              count_citation_code_traffic = n_distinct(payment_id_number[citation_cause=="traffic"]),
-              count_citation_code_fls_arrest = n_distinct(payment_id_number[citation_cause == "fls_arrest"]),
-              count_citation_code_med_mal = n_distinct(payment_id_number[citation_cause == "med_mal"]),
-              count_citation_code_prop_maint = n_distinct(payment_id_number[citation_cause == "prop_maint"]),
-              count_citation_code_fireflood = n_distinct(payment_id_number[citation_cause == "fire_flood"]),
-              count_citation_code_prop_seize = n_distinct(payment_id_number[citation_cause == "prop_seize"]),
-              count_citation_code_miscellany = n_distinct(payment_id_number[citation_cause == "miscellany"]),
-              count_citation_code_aircrash = n_distinct(payment_id_number[citation_cause == "aircrash"]),
-              payment_sum_citation_code_traffic = sum(payment_amount[citation_cause=="traffic"]),
-              payment_sum_citation_code_fls_arrest = sum(payment_amount[citation_cause == "fls_arrest"]),
-              payment_sum_citation_code_med_mal = sum(payment_amount[citation_cause == "med_mal"]),
-              payment_sum_citation_code_prop_maint = sum(payment_amount[citation_cause == "prop_maint"]),
-              payment_sum_citation_code_fire_flood = sum(payment_amount[citation_cause == "fire_flood"]),
-              payment_sum_citation_code_prop_seize = sum(payment_amount[citation_cause == "prop_seize"]),
-              payment_sum_citation_code_miscellany = sum(payment_amount[citation_cause == "miscellany"]),
-              payment_sum_citation_code_aircrasht = sum(payment_amount[citation_cause == "aircrash"])
+              payment_amount_median = median(payment_amount)
     )
 
+mega_data_summary_by_citation_cause <- mega_data|>
+  group_by(floor_date, citation_cause)|>
+  summarize(count = n_distinct(payment_id_number), 
+              payment_amount_sum = sum(payment_amount), 
+              payment_amount_median = median(payment_amount))
 ```
+
+
+##graphing
 
 now let's try to create some line graphs tracking changes in each of these  statistics over time
 ```{r}
@@ -365,6 +362,15 @@ ggplot(mega_data_summary, aes(x = floor_date, y = payment_amount_sum)) +
   theme_light()+
   theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
   ggtitle("Total amount of money paid out by month")
+
+ggplot(mega_data_summary, aes(x = floor_date, y = payment_amount_sum)) +
+  geom_col()+
+  scale_y_continuous(breaks = scales::pretty_breaks(n = 10), name = "Dollars",
+                     expand = c(0, 0), limits = c(0, NA), labels = scales::label_dollar())+
+  scale_x_date(date_breaks = "1 year", date_minor_breaks = "1 month", labels = scales::label_date_short(), name = "Year")+
+  theme_light()+
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
+  ggtitle("Total amount of money paid out per month")
 ```
 huh, that last spike is interesting... lets zoom in by narrowing our data to the past 5 years
 ```{r}
@@ -383,70 +389,43 @@ playing around:all payments, color coded by kind
 ```{r}
 mega_data |>
   filter(payment_sent_date> ymd("2016-01-01"))|>
-  ggplot(aes(x = payment_sent_date, y = payment_amount, color = principle_citation_code)) +
+  ggplot(aes(x = payment_sent_date, y = payment_amount, color = citation_cause)) +
     geom_point()+
     scale_y_continuous(breaks = scales::pretty_breaks(n = 10), name = "claim payment amounts",
                        expand = c(0, 0), limits = c(0, NA), labels = scales::label_dollar())+
     scale_x_date(date_breaks = "1 year", date_minor_breaks = "1 month", labels = scales::label_date_short())+
     theme_light()
-#needs work to look better; ideally would also add new column to megadata that consolidates all false arrests, etc. will come back to it
+#needs work to look better; will come back to it
 ```
-
+lets play around with our second summary stastic table and group some stuff by kind
 ```{r}
-mega_data_summary |>
+mega_data_summary_by_citation_cause |>
   filter(floor_date > ymd("2016-01-01"))|>
-    ggplot(aes(x = floor_date))+
-    geom_point(aes(y = count_citation_code_traffic, color = "red"))+
-    geom_point(aes(y = count_citation_code_flsarrest, color = "orange"))+
-    geom_point(aes(y = count_citation_code_med_mal, color = "yellow"))+
-    geom_point(aes(y = count_citation_code_propmaint, color = "green"))+
-    geom_point(aes(y = count_citation_code_propseize, color = "blue"))+
-    geom_point(aes(y = count_citation_code_miscellany, color = "purple"))+ #im excluding aircrash here
-    scale_y_continuous(breaks = scales::pretty_breaks(n = 10), name = "Number of claims", expand = c(0, 0), limits = c(0, NA,))+
+    ggplot(aes(x = floor_date, y = count, color = citation_cause))+
+    geom_line()+
+    scale_y_continuous(breaks = scales::pretty_breaks(n = 10), name = "Number of claims")+
     scale_x_date(date_breaks = "1 year", date_minor_breaks = "1 month", labels = scales::label_date_short())+
     theme_light()
-#this is fine but not great. Needs work to remove bottom layer of zeros and fix label on the side
-#suddenlt this doesnt work. idk
-```
-lets add a smooth line
-```{r}
-mega_data_summary |>
+
+mega_data_summary_by_citation_cause |>
   filter(floor_date > ymd("2016-01-01"))|>
-    ggplot(aes(x = floor_date))+
-    geom_point(aes(y = count_citation_code_traffic, color = "red"))+
-    geom_smooth(aes(y=count_citation_code_traffic))+
-    geom_point(aes(y = count_citation_code_flsarrest, color = "orange"))+
-    geom_smooth(aes(y=count_citation_code_flsarrest))+
-    geom_point(aes(y = count_citation_code_med_mal, color = "yellow"))+
-    geom_smooth(aes(y=count_citation_code_med_mal))+
-    geom_point(aes(y = count_citation_code_propmaint, color = "green"))+
-    geom_smooth(aes(y=count_citation_code_propmaint))+
-    geom_point(aes(y = count_citation_code_propseize, color = "blue"))+
-    geom_smooth(aes(y=count_citation_code_propseize))+
-    geom_point(aes(y = count_citation_code_miscellany, color = "purple"))+ #im excluding aircrash here
-    geom_smooth(aes(y = count_citation_code_miscellany))+ #im excluding aircrash here
-    scale_y_continuous(breaks = scales::pretty_breaks(n = 10), name = "Number of claims", expand = c(0, 0), limits = c(0, NA))+
+    ggplot(aes(x = floor_date, y = count, color = citation_cause, fill = citation_cause))+
+    geom_col()+
+    scale_y_continuous(breaks = scales::pretty_breaks(n = 10), name = "Number of claims")+
     scale_x_date(date_breaks = "1 year", date_minor_breaks = "1 month", labels = scales::label_date_short())+
     theme_light()
-```
-uhhh thats not great. but would make more sense with the money amounts perhaps?
 
-```{r}
-mega_data_summary |>
+#bar chart of payment amounts by year and citation cause
+mega_data_summary_by_citation_cause |>
   filter(floor_date > ymd("2016-01-01"))|>
-  mutate(across(where(is.numeric), na_if, 0))|> #remove zero values bcs our goal is to
-    ggplot(aes(x = floor_date))+
-    geom_point(aes(y = payment_sum_citation_code_traffic, color = "red"))+
-    geom_point(aes(y = payment_sum_citation_code_fls_arrest, color = "orange"))+
-    geom_point(aes(y = payment_sum_citation_code_med_mal, color = "yellow"))+
-    geom_point(aes(y = payment_sum_citation_code_prop_maint, color = "green"))+
-    geom_point(aes(y = payment_sum_citation_code_prop_seize, color = "blue"))+
-    geom_point(aes(y = payment_sum_citation_code_miscellany, color = "purple"))+ #im excluding aircrash here
-    scale_y_continuous(breaks = scales::pretty_breaks(n = 10), name = "Amount paid out per month", expand = c(0, 0), limits = c(0, NA), labels = scales::label_dollar())+
-    scale_x_date(date_breaks = "1 year", date_minor_breaks = "1 month", labels = scales::label_date_short())
-
-#this is pretty bad, too... but what are we even going for here? what would be interesting? i will return to this but not right away
+    ggplot(aes(x = floor_date, y = payment_amount_sum, color = citation_cause, fill = citation_cause))+
+    geom_col()+
+    scale_y_continuous(breaks = scales::pretty_breaks(n = 10), name = "Number of claims")+
+    scale_x_date(date_breaks = "1 year", date_minor_breaks = "1 month", labels = scales::label_date_short())+
+    theme_light()
+#come back and do y axis as money
 ```
+
 some attempts at visualizing payment amounts by citation cause- this info is, or may be, of some practical value to lawyers seeking to sue through the ftca, so I want it to be legible
 ```{r}
 # #facet wrapped histogram 
@@ -524,16 +503,7 @@ mega_data|>
 
 #needs some work on legend etc but i think pretty good
 ```
-okay, another thing that would be good to have is a stacked boxplot of money per year
-```{r}
-mega_data|>
-  filter(floor_date > ymd("2016-01-01"))|>
-  group_by(floor_date)|>
-  summarize(payment_sum = sum(payment_amount))|>
-  ggplot(aes(x = floor_date, y = payment_sum))+
-  geom_col()
-           
-```
+
 
 
 TO DO:
@@ -541,17 +511,17 @@ TO DO:
  
 - facet wrapped histogram of payment amount, wrapped by citation code
 
-- scatter plot with jitter and alpha, x axis is citation code, y axis is payment amount, boxplot/violin plot superimposed
+- scatter plot with jitter and alpha, x axis is citation code, y axis is payment amount, boxplot/violin plot superimposed [done]
 
 - admin vs judicially awarded over time
 
 - create codebook
 
+- stacked bar by year and citation cause,[done]
 
-```{r}
-mega_data|>
-  filter()
-```
+-filled bar by citation cause; both with y as count and y as patment amount
+
+-> one of the big stories here is that the stuff they're describing as traffic and misc cannot possibly be
 
 
 Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Cmd+Option+I*.
