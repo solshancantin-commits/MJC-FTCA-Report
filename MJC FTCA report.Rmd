@@ -391,8 +391,8 @@ mega_data_summary |>
 playing around:all payments, color coded by kind
 ```{r}
 mega_data |>
-  filter(payment_sent_date> ymd("2016-01-01"))|>
-  ggplot(aes(x = payment_sent_date, y = payment_amount, color = citation_cause)) +
+  #filter(payment_sent_date> ymd("2016-01-01"))|>
+  ggplot(aes(x = payment_sent_date, y = payment_amount, color = citation_cause, alpha = 0.75)) +
     geom_point()+
     scale_y_continuous(breaks = scales::pretty_breaks(n = 10), name = "claim payment amounts",
                        expand = c(0, 0), limits = c(0, NA), labels = scales::label_dollar())+
@@ -404,35 +404,66 @@ lets play around with our second summary stastic table and group some stuff by k
 ```{r}
 #line graph of number of claims per month over time, color = citation cause
 mega_data_summary_by_citation_cause |>
-  filter(floor_date > ymd("2016-01-01"))|>
+  #filter(floor_date > ymd("2016-01-01"))|>
     ggplot(aes(x = floor_date, y = count, color = citation_cause))+
     geom_line()+
-    scale_y_continuous(breaks = scales::pretty_breaks(n = 10), name = "Number of claims")+
+    scale_y_continuous(breaks = scales::pretty_breaks(n = 10), name = "Number of claims")+ 
     scale_x_date(date_breaks = "1 year", date_minor_breaks = "1 month", labels = scales::label_date_short(), name = "Month")+
     theme_light()
 
 #bar graph of number of claims per month over time, color = citation cause
 mega_data_summary_by_citation_cause |>
-  filter(floor_date > ymd("2016-01-01"))|>
+  #filter(floor_date > ymd("2016-01-01"))|>
     ggplot(aes(x = floor_date, y = count, color = citation_cause, fill = citation_cause))+
     geom_col()+
-    scale_y_continuous(breaks = scales::pretty_breaks(n = 10), name = "Number of claims")+
+    scale_y_continuous(breaks = scales::pretty_breaks(n = 10), name = "Number of claims", expand = expansion(mult = c(0, 0.05)))+
+  #with bar graphs i think it looks better to have the bars start at the x axis = 0 (thats what expand does)
     scale_x_date(date_breaks = "1 year", date_minor_breaks = "1 month", labels = scales::label_date_short(), name = "Month")+
     theme_light()
 
-#bar chart of payment amounts by year and citation cause
+#bar chart of payment amounts by year/month and citation cause
 mega_data_summary_by_citation_cause |>
-  filter(floor_date > ymd("2016-01-01"))|>
+ # filter(floor_date > ymd("2016-01-01"))|>
     ggplot(aes(x = floor_date, y = payment_amount_sum, color = citation_cause, fill = citation_cause))+
     geom_col()+
-    scale_y_continuous(breaks = scales::pretty_breaks(n = 10), name = "Amount paid", label = scales::label_dollar())+
+    scale_y_continuous(breaks = scales::pretty_breaks(n = 10), name = "Amount paid", label = scales::label_dollar(), expand = expansion(mult = c(0, 0.05)))+
     scale_x_date(date_breaks = "1 year", date_minor_breaks = "1 month", labels = scales::label_date_short(), name = "Month")+
     theme_light()
 #come back and do y axis as money
 ```
+lets recreate that last chart but binned by year
+```{r}
+#bar chart of payment amounts by year and citation cause
+mega_data |>
+  filter(floor_date > ymd("2016-01-01"))|>
+  group_by(year=year(payment_sent_date), citation_cause)|>
+  summarize(payment_amount_sum_by_year = sum(payment_amount),)|>
+    ggplot(aes(x = year, y = payment_amount_sum_by_year, color = citation_cause, fill = citation_cause))+
+    geom_col()+
+    scale_y_continuous(breaks = scales::pretty_breaks(n = 10), name = "Amount paid", label = scales::label_dollar(),expand = expansion(mult = c(0, 0.05)))+
+    scale_x_date(date_breaks = "5 years", date_labels = "%y")+
+    theme_light()
+
+#need to figure out why x axis lables don't work
+```
 
 some attempts at visualizing payment amounts by citation cause- this info is, or may be, of some practical value to lawyers seeking to sue through the ftca, so I want it to be legible
 ```{r}
+#maybe the solution is a facet wrapped density plot?
+# i ended up liking this the best so I'm reducing it to just the past 10 years, getting rid of the empty 'aircrash' cause, and adding some visual elements
+mega_data|>
+  filter(floor_date > ymd("2016-01-01"), citation_cause!="aircrash")|>
+  ggplot(aes(x=payment_amount, fill=citation_cause))+
+    geom_density()+
+    scale_x_log10(labels = scales::label_dollar(), breaks = scales::breaks_log(n = 8), name = "Payment") + #i had to scale the x axis by log in order to make anything at all visible, but it wasn't what i had in mind and i would rather not have
+    facet_wrap(~citation_cause, scales = "free_y", ncol=1)+
+    scale_y_continuous(breaks = scales::pretty_breaks(n = 2), name = "Density", expand = c(0, 0), limits = c(0, NA))+
+    theme_light()
+```
+
+lets try to make a histogram because I think that that's more accurate than these density plots which kind of make up data. I also want to try to do it without a log axis becausethe log axis makes things misleading imo
+```{r}
+
 # #facet wrapped histogram 
 # ggplot(mega_data, aes(x=payment_amount, fill=citation_cause))+
 #   geom_histogram()+
@@ -446,29 +477,22 @@ some attempts at visualizing payment amounts by citation cause- this info is, or
 #   geom_density(alpha = 0.5)
 # #this is pretty but close to useless
 
-#maybe the solution is a facet wrapped density plot?
-# i ended up liking this the best so I'm reducing it to just the past 10 years, getting rid of the empty 'aircrash' cause, and adding some visual elements
-mega_data|>
-  filter(floor_date > ymd("2016-01-01"), citation_cause!="aircrash")|>
-  ggplot(aes(x=payment_amount, fill=citation_cause))+
-    geom_density()+
-    scale_x_log10(labels = scales::label_dollar(), breaks = scales::breaks_log(n = 8), name = "Payment") + #i had to scale the x axis by log in order to make anything at all visible, but it wasn't what i had in mind and i would rather not have
-    facet_wrap(~citation_cause, scales = "free_y", ncol=1)+
-    scale_y_continuous(breaks = scales::pretty_breaks(n = 2), name = "Density", expand = c(0, 0), limits = c(0, NA))+
-    theme_light()
-
 #an alternative without the log scale x axis and in fact without a shared x axis at all
 mega_data|>
-  filter(floor_date > ymd("2016-01-01"), citation_cause!="aircrash")|>
-  ggplot(aes(x=payment_amount, fill=citation_cause))+
-    geom_histogram()+ # i switched to a histogram and it made me realize the density plot might be misleading...
-    facet_wrap(~citation_cause, scales = "free", ncol=1)+ #scales are free bcs otherwise things are too different
-    scale_x_continuous(breaks = scales::pretty_breaks(n = 4), name = "Payment amount", expand = c(0, 0), limits = c(0, NA), labels = scales::label_dollar())+
-    scale_y_continuous(breaks = scales::pretty_breaks(n = 2), name = "Density", expand = c(0, 0), limits = c(0, NA))+
+  filter(floor_date > ymd("2016-01-01"))|>
+  filter(citation_cause %in% c("fls_arrest", "prop_sieze", "traffic", "prop_maint")) |>
+  ggplot(aes(payment_amount))+
+    geom_histogram(bins = 200)+ 
+    facet_wrap(~citation_cause, scales = "free", ncol=1)+ #ncol = 1 so plots r on top of eachotehr and more comparable
+    scale_x_continuous(breaks = scales::pretty_breaks(n = 4), name = "Payment amount", labels = scales::label_dollar())+
+    scale_y_continuous(breaks = scales::pretty_breaks(n = 2), name = "Count")+
     theme_light()
 
 #needs thought about histogram v density, work to fix squishing and legend, add title, etc. aesthetically
+
 ```
+
+
 I think the reason that the histograms are so split might be because we're looking at both litigative and administrative payments.lets split those up.
 
 ```{r}
@@ -503,12 +527,29 @@ mega_data|>
   geom_jitter(alpha = 0.4, aes(color = citation_cause)) +
   geom_boxplot(alpha = 0) +
   facet_wrap(~judgment_type_code, scales = "fixed")+
+  #it just really needs to be logscaled to be at all legible unfortunately
   scale_y_log10(labels = scales::label_dollar(), breaks = scales::breaks_log(n = 15), name = "Payment")+
-  theme_light()
+  scale_x_discrete(labels = c(fls_arrest =  "False arrest", 
+                              med_mal = "Medical malpractice",
+                              miscellany = "Miscellany",
+                              #not really sure how to define prop_maint and prop_seiz, will come back to it
+                              traffic = "Traffic"
+                              ))+
+  theme_light()+
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))
+
 
 #needs some work on legend etc but i think pretty good
 ```
 
+I want to print some summary statistics to go along with this
+```{r}
+mega_data|>
+  filter(floor_date > ymd("2016-01-01"), citation_cause!="aircrash", citation_cause!="fire_flood")|>
+  group_by(judgment_type_code, citation_cause)|>
+  summarize(median_payment_amount=median(payment_amount))
+  #write_csv("median_payment_amounts.csv")
+```
 
 
 TO DO:
