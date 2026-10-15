@@ -149,7 +149,7 @@ mega_data<-mega_data|>
                                       #"General Services Administration; DHS - Immigration  & Customs Enforcement (ICE)",
                                       "Customs and Border Protection; Immigration & Custom; Internal Revenue Service/S&E",
                                       "Immigration & Custom",
-                                      "DHS - Office of the Inspector General",
+                                      #"DHS - Office of the Inspector General",
                                       #"Citizen & Immig Svc (USCIS); Department of State",
                                       #"Customs and Border Protection; Marshals Service",
                                       "DHS-Immigration Sevc",
@@ -477,7 +477,7 @@ mega_data |>
     theme_light() +
     theme(axis.title.x = element_blank(), axis.title.y = element_blank()) +
     ggtitle("Total amount withdrawn from the judgement fund per year by citation code")
-#need to figure out why x axis lables don't work
+#need to figure out how to add x axis labels that work
 ```
 
 some attempts at visualizing payment amounts by citation cause- this info is, or may be, of some practical value to lawyers seeking to sue through the ftca, so I want it to be legible
@@ -583,6 +583,130 @@ mega_data|>
   #write_csv("median_payment_amounts.csv")
 ```
 
+I want to zoom in on the 'miscellany' category and get some more detailed info about it 
+```{r}
+mega_data_summary_by_citation_cause|>
+  filter(floor_date > ymd("2016-01-01"), citation_cause=="miscellany")|>
+  ggplot(aes(x = floor_date, y = count)) +
+  geom_point()+
+  geom_smooth()+
+  scale_y_continuous(breaks = scales::pretty_breaks(n = 10), name = "Claims per month",
+                     expand = c(0, 0), limits = c(0, NA))+
+  scale_x_date(date_breaks = "1 year", date_minor_breaks = "1 month", labels = scales::label_date_short(), name = "Time")+
+  theme_light()+
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1), axis.title.x = element_blank()) +
+  ggtitle("Number of successful claims with citation code miscellany each month since 2016")
+```
+
+lets see how the median payments have changed over time
+```{r}
+mega_data_summary_by_citation_cause|>
+  filter(floor_date > ymd("2016-01-01"), citation_cause=="miscellany")|>
+  ggplot(aes(x = floor_date, y = payment_amount_median)) +
+  geom_point()+
+  geom_smooth()+
+  scale_y_continuous(breaks = scales::pretty_breaks(n = 10), name = "Median payment amount",
+                     expand = c(0, 0), limits = c(0, NA), labels = scales::label_dollar())+
+  scale_x_date(date_breaks = "1 year", date_minor_breaks = "1 month", labels = scales::label_date_short(), name = "Time")+
+  theme_light()+
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1), axis.title.x = element_blank(), axis.title.y = element_blank()) +
+  ggtitle("Median payment amount per claim each month")
+  
+mega_data|>
+  filter(floor_date > ymd("2016-01-01"), citation_cause=="miscellany")|>
+  distinct(defendent_agency_name)
+
+```
+lets see how much money has been paid out each month for miscellanious claims
+```{r}
+#bar chart of payment amounts by year/month and citation cause
+mega_data_summary_by_citation_cause |>
+   filter(floor_date > ymd("2016-01-01"), citation_cause == "miscellany")|>
+    ggplot(aes(x = floor_date, y = payment_amount_sum))+
+    geom_col()+
+    scale_y_continuous(breaks = scales::pretty_breaks(n = 10), name = "Amount paid", label = scales::label_dollar(), expand = expansion(mult = c(0, 0.05)))+
+    scale_x_date(date_breaks = "1 year", date_minor_breaks = "1 month", labels = scales::label_date_short(), name = "Month")+
+    scale_fill_discrete(labels = c("Aircrash", "Fire flood", "False arrest", "Medical malpractice", "Miscellany", "Prop. Maint.", "Prop. Seize.", "Traffic"), name = "Citation code")+
+    theme_light()+
+    theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1), axis.title.x = element_blank(), axis.title.y = element_blank())+
+    ggtitle("Total amount withdrawn from the judgement fund per month for 'miscellanious' claims since")
+
+```
+
+lets do histogram of payment amounts since 2020
+```{r}
+mega_data|>
+  filter(floor_date > ymd("2016-01-01"), citation_cause =="miscellany")|>
+  ggplot(aes(x=payment_amount))+
+    geom_histogram(binwidth=10000, fill = "blue", color = "white")+
+    scale_y_continuous(breaks = scales::pretty_breaks(n = 5), name = "Count", expand = c(0, 0), limits = c(0, NA))+
+    scale_x_continuous(name = "Payment amount", expand = c(0, 0), limits = c(0, NA), breaks = seq(0, 2000000, by = 200000), minor_breaks = seq(0, 2000000, by = 10000), labels = scales::label_dollar())+
+    facet_wrap(~judgment_type_code, scales = "free_y", ncol=1) +
+    #scale_x_continuous(breaks = scales::pretty_breaks(n=20), name = "Count")+
+    #scale_fill_discrete(guide = "none")+
+    theme_light()
+```
+
+lets do the same for 'traffic'
+```{r}
+mega_data_summary_by_citation_cause|>
+  filter(floor_date > ymd("2016-01-01"), citation_cause=="traffic")|>
+  ggplot(aes(x = floor_date, y = count)) +
+  geom_point()+
+  geom_smooth()+
+  scale_y_continuous(breaks = scales::pretty_breaks(n = 10), name = "Claims per month",
+                     expand = c(0, 0), limits = c(0, NA))+
+  scale_x_date(date_breaks = "1 year", date_minor_breaks = "1 month", labels = scales::label_date_short(), name = "Time")+
+  theme_light()+
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1), axis.title.x = element_blank()) +
+  ggtitle("Number of successful claims with citation code traffic each month since 2016")
+```
+```{r}
+mega_data_summary_by_citation_cause|>
+  filter(floor_date > ymd("2016-01-01"), citation_cause=="traffic")|>
+  ggplot(aes(x = floor_date, y = payment_amount_median)) +
+  geom_point()+
+  geom_smooth()+
+  scale_y_continuous(breaks = scales::pretty_breaks(n = 10), name = "Median payment amount",
+                     expand = c(0, 0), limits = c(0, NA), labels = scales::label_dollar())+
+  scale_x_date(date_breaks = "1 year", date_minor_breaks = "1 month", labels = scales::label_date_short(), name = "Time")+
+  theme_light()+
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1), axis.title.x = element_blank(), axis.title.y = element_blank()) +
+  ggtitle("Median payment amount per claim each month")
+  
+mega_data|>
+  filter(floor_date > ymd("2016-01-01"), citation_cause=="traffic")|>
+  distinct(defendent_agency_name)
+
+```
+
+lets try to do the histogram
+```{r}
+mega_data|>
+  filter(floor_date > ymd("2016-01-01"), citation_cause =="traffic")|>
+  ggplot(aes(x=payment_amount))+
+    geom_histogram(binwidth = 10000, fill = "blue", color = "blue")+
+    scale_y_continuous(breaks = scales::pretty_breaks(n = 5), name = "Count", expand = c(0, 0), limits = c(0, NA))+
+    scale_x_continuous(name = "Payment amount", expand = c(0, 0), limits = c(0, NA), breaks = seq(0, 10000000, by = 500000), minor_breaks = seq(0, 10000000, by = 50000), labels = scales::label_dollar())+
+    #facet_wrap(~judgment_type_code, scales = "free_y", ncol=1) +
+    theme_light()
+```
+
+now total payments
+```{r}
+mega_data_summary_by_citation_cause |>
+   filter(floor_date > ymd("2016-01-01"), citation_cause == "traffic")|>
+    ggplot(aes(x = floor_date, y = payment_amount_sum))+
+    geom_col()+
+    scale_y_continuous(breaks = scales::pretty_breaks(n = 10), name = "Amount paid", label = scales::label_dollar(), expand = expansion(mult = c(0, 0.05)))+
+    scale_x_date(date_breaks = "1 year", date_minor_breaks = "1 month", labels = scales::label_date_short(), name = "Month")+
+    theme_light()+
+    theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1), axis.title.x = element_blank(), axis.title.y = element_blank())+
+    ggtitle("Total amount withdrawn from the judgement fund per month for 'traffic' claims since")
+
+#that one data point is...
+#suggests yearly pattern
+```
 
 TO DO:
 
