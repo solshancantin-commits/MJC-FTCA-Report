@@ -302,7 +302,7 @@ now let's try to create some line graphs tracking changes in each of these  stat
 
 ggplot(mega_data_summary, aes(x = floor_date, y = count)) +
   geom_line()+
-  scale_y_continuous(breaks = scales::pretty_breaks(n = 10), name = "Number of claims",
+  scale_y_continuous(breaks = scales::pretty_breaks(n = 10), name = "Number of successful claims",
                      expand = c(0, 0), limits = c(0, NA))+
   scale_x_date(date_breaks = "1 year", date_minor_breaks = "1 month", labels = scales::label_date_short())+
   theme_light()+
@@ -313,11 +313,11 @@ ggplot(mega_data_summary, aes(x = floor_date, y = count)) +
 ggplot(mega_data_summary, aes(x = floor_date, y = count)) +
   geom_point()+
   geom_smooth()+
-  scale_y_continuous(breaks = scales::pretty_breaks(n = 10), name = "Number of claims",
+  scale_y_continuous(breaks = scales::pretty_breaks(n = 10), name = "Claims per month",
                      expand = c(0, 0), limits = c(0, NA))+
-  scale_x_date(date_breaks = "1 year", date_minor_breaks = "1 month", labels = scales::label_date_short(), name = "Year")+
+  scale_x_date(date_breaks = "1 year", date_minor_breaks = "1 month", labels = scales::label_date_short(), name = "Time")+
   theme_light()+
-  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1), axis.title.x = element_blank()) +
   ggtitle("Number of successful claims each month")
 
 ```
@@ -328,20 +328,20 @@ ggplot(mega_data_summary, aes(x = floor_date, y = payment_amount_median)) +
   geom_line()+
   scale_y_continuous(breaks = scales::pretty_breaks(n = 10), name = "Median payment amount",
                      expand = c(0, 0), limits = c(0, NA), labels = scales::label_dollar())+
-  scale_x_date(date_breaks = "1 year", date_minor_breaks = "1 month", labels = scales::label_date_short())+
+  scale_x_date(date_breaks = "1 year", date_minor_breaks = "1 month", labels = scales::label_date_short(), name = "Month")+
   theme_light()+
   theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
-  ggtitle("Median payment amount per claim by month and year")
+  ggtitle("Median payment amount per claim each month")
 
 ggplot(mega_data_summary, aes(x = floor_date, y = payment_amount_median)) +
   geom_point()+
   geom_smooth()+
   scale_y_continuous(breaks = scales::pretty_breaks(n = 10), name = "Median payment amount",
                      expand = c(0, 0), limits = c(0, NA), labels = scales::label_dollar())+
-  scale_x_date(date_breaks = "1 year", date_minor_breaks = "1 month", labels = scales::label_date_short())+
+  scale_x_date(date_breaks = "1 year", date_minor_breaks = "1 month", labels = scales::label_date_short(), name = "Time")+
   theme_light()+
-  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
-  ggtitle("Median payment amount per claim by month and year")
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1), axis.title.x = element_blank(), axis.title.y = element_blank()) +
+  ggtitle("Median payment amount per claim each month")
 ```
 Those 2025 spikes must be the child seperation payments
 
@@ -363,7 +363,7 @@ ggplot(mega_data_summary, aes(x = floor_date, y = payment_amount_sum)) +
                      expand = c(0, 0), limits = c(0, NA), labels = scales::label_dollar())+
   scale_x_date(date_breaks = "1 year", date_minor_breaks = "1 month", labels = scales::label_date_short(), name = "Date")+
   theme_light()+
-  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1), axis.title.x = element_blank(), axis.title.y = element_blank()) +
   ggtitle("Total amount of money paid out each month")
 
 ggplot(mega_data_summary, aes(x = floor_date, y = payment_amount_sum)) +
@@ -392,25 +392,39 @@ playing around:all payments, color coded by kind
 ```{r}
 mega_data |>
   #filter(payment_sent_date> ymd("2016-01-01"))|>
-  ggplot(aes(x = payment_sent_date, y = payment_amount, color = citation_cause, alpha = 0.75)) +
+  ggplot(aes(x = payment_sent_date, y = payment_amount, color = citation_cause, alpha = 0.8)) +
     geom_point()+
-    scale_y_continuous(breaks = scales::pretty_breaks(n = 10), name = "claim payment amounts",
+    scale_y_continuous(breaks = scales::pretty_breaks(n = 10), name = "Payment amount",
                        expand = c(0, 0), limits = c(0, NA), labels = scales::label_dollar())+
-    scale_x_date(date_breaks = "1 year", date_minor_breaks = "1 month", labels = scales::label_date_short())+
-    theme_light()
+    scale_x_date(date_minor_breaks = "1 month", date_breaks = "1 year", labels = scales::label_date_short(), name = "Date")+
+    scale_color_discrete(labels = c("Aircrash", "Fire flood", "False arrest", "Medical malpractice", "Miscellany", "Prop. Maint.", "Prop. Seize.", "Traffic"), name = "Citation code")+
+    scale_alpha_continuous(guide = "none")+ #gets rid of weird automatic alpha legend
+    theme_light() +
+    theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1), axis.title.x = element_blank(), axis.title.y = element_blank())+
+    ggtitle("Payments over time")
+
+
 #needs work to look better; will come back to it
 ```
 lets play around with our second summary stastic table and group some stuff by kind
 ```{r}
 #line graph of number of claims per month over time, color = citation cause
 mega_data_summary_by_citation_cause |>
-  #filter(floor_date > ymd("2016-01-01"))|>
+    filter(floor_date > ymd("2016-01-01"))|> #this one is only since 2016
     ggplot(aes(x = floor_date, y = count, color = citation_cause))+
-    geom_line()+
+    geom_line(linewidth = 0.4, alpha = 0.8)+
+    geom_point(size=0.75)+
+    #facet_wrap(~citation_cause, scales = "free_y", ncol=1)+
     scale_y_continuous(breaks = scales::pretty_breaks(n = 10), name = "Number of claims")+ 
     scale_x_date(date_breaks = "1 year", date_minor_breaks = "1 month", labels = scales::label_date_short(), name = "Month")+
-    theme_light()
+    scale_color_discrete(labels = c("Aircrash", "Fire flood", "False arrest", "Medical malpractice", "Miscellany", "Prop. Maint.", "Prop. Seize.", "Traffic"), name = "Citation code")+
+    theme_light()+
+    theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1), axis.title.x = element_blank())+
+    ggtitle("Number of claims each month by citation code")
+```
 
+
+```{r}
 #bar graph of number of claims per month over time, color = citation cause
 mega_data_summary_by_citation_cause |>
   #filter(floor_date > ymd("2016-01-01"))|>
@@ -420,7 +434,10 @@ mega_data_summary_by_citation_cause |>
   #with bar graphs i think it looks better to have the bars start at the x axis = 0 (thats what expand does)
     scale_x_date(date_breaks = "1 year", date_minor_breaks = "1 month", labels = scales::label_date_short(), name = "Month")+
     theme_light()
+```
 
+
+```{r}
 #bar chart of payment amounts by year/month and citation cause
 mega_data_summary_by_citation_cause |>
  # filter(floor_date > ymd("2016-01-01"))|>
@@ -428,8 +445,11 @@ mega_data_summary_by_citation_cause |>
     geom_col()+
     scale_y_continuous(breaks = scales::pretty_breaks(n = 10), name = "Amount paid", label = scales::label_dollar(), expand = expansion(mult = c(0, 0.05)))+
     scale_x_date(date_breaks = "1 year", date_minor_breaks = "1 month", labels = scales::label_date_short(), name = "Month")+
-    theme_light()
-#come back and do y axis as money
+    scale_fill_discrete(labels = c("Aircrash", "Fire flood", "False arrest", "Medical malpractice", "Miscellany", "Prop. Maint.", "Prop. Seize.", "Traffic"), name = "Citation code")+
+    scale_color_discrete(guide = "none")+
+    theme_light()+
+    theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1), axis.title.x = element_blank(), axis.title.y = element_blank())+
+    ggtitle("Total amount withdrawn from the judgement fund per month by citation code")
 ```
 lets recreate that last chart but binned by year
 ```{r}
@@ -440,10 +460,23 @@ mega_data |>
   summarize(payment_amount_sum_by_year = sum(payment_amount),)|>
     ggplot(aes(x = year, y = payment_amount_sum_by_year, color = citation_cause, fill = citation_cause))+
     geom_col()+
-    scale_y_continuous(breaks = scales::pretty_breaks(n = 10), name = "Amount paid", label = scales::label_dollar(),expand = expansion(mult = c(0, 0.05)))+
-    scale_x_date(date_breaks = "5 years", date_labels = "%y")+
-    theme_light()
-
+    scale_y_continuous(breaks = scales::pretty_breaks(n = 10),
+                       name = "Amount paid", 
+                       label = scales::label_dollar(), 
+                       expand = expansion(mult = c(0, 0.05))) +
+    scale_fill_discrete(labels = c("Aircrash", 
+                                   "Fire flood", 
+                                   "False arrest", 
+                                   "Medical malpractice",
+                                   "Miscellany", 
+                                   "Prop. Maint.", 
+                                   "Prop. Seize.", 
+                                   "Traffic"), 
+                        name = "Citation code") +
+    scale_color_discrete(guide = "none")+
+    theme_light() +
+    theme(axis.title.x = element_blank(), axis.title.y = element_blank()) +
+    ggtitle("Total amount withdrawn from the judgement fund per year by citation code")
 #need to figure out why x axis lables don't work
 ```
 
@@ -528,18 +561,17 @@ mega_data|>
   geom_boxplot(alpha = 0) +
   facet_wrap(~judgment_type_code, scales = "fixed")+
   #it just really needs to be logscaled to be at all legible unfortunately
-  scale_y_log10(labels = scales::label_dollar(), breaks = scales::breaks_log(n = 15), name = "Payment")+
-  scale_x_discrete(labels = c(fls_arrest =  "False arrest", 
+  scale_y_log10(labels = scales::label_dollar(), breaks = scales::breaks_log(n = 15), name = "Payment amount")+
+  scale_color_discrete(labels = c(fls_arrest =  "False arrest", 
                               med_mal = "Medical malpractice",
                               miscellany = "Miscellany",
-                              #not really sure how to define prop_maint and prop_seiz, will come back to it
+                              prop_maint = "Prop. Maint.", 
+                              prop_seize = "Prop. Seize.",
                               traffic = "Traffic"
-                              ))+
+                              ),
+                       name = "Citation code") +
   theme_light()+
-  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))
-
-
-#needs some work on legend etc but i think pretty good
+  theme(axis.text.x = element_blank(), axis.title.x = element_blank())
 ```
 
 I want to print some summary statistics to go along with this
