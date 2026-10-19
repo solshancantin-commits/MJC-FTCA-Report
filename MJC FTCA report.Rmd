@@ -313,12 +313,12 @@ ggplot(mega_data_summary, aes(x = floor_date, y = count)) +
 ggplot(mega_data_summary, aes(x = floor_date, y = count)) +
   geom_point()+
   geom_smooth()+
-  scale_y_continuous(breaks = scales::pretty_breaks(n = 10), name = "Claims per month",
+  scale_y_continuous(breaks = scales::pretty_breaks(n = 10), name = "Number of payments",
                      expand = c(0, 0), limits = c(0, NA))+
   scale_x_date(date_breaks = "1 year", date_minor_breaks = "1 month", labels = scales::label_date_short(), name = "Time")+
   theme_light()+
   theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1), axis.title.x = element_blank()) +
-  ggtitle("Number of successful claims each month")
+  ggtitle("Number of payments each month")
 
 ```
 
@@ -331,7 +331,7 @@ ggplot(mega_data_summary, aes(x = floor_date, y = payment_amount_median)) +
   scale_x_date(date_breaks = "1 year", date_minor_breaks = "1 month", labels = scales::label_date_short(), name = "Month")+
   theme_light()+
   theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
-  ggtitle("Median payment amount per claim each month")
+  ggtitle("Median amount per payment each month")
 
 ggplot(mega_data_summary, aes(x = floor_date, y = payment_amount_median)) +
   geom_point()+
@@ -341,7 +341,7 @@ ggplot(mega_data_summary, aes(x = floor_date, y = payment_amount_median)) +
   scale_x_date(date_breaks = "1 year", date_minor_breaks = "1 month", labels = scales::label_date_short(), name = "Time")+
   theme_light()+
   theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1), axis.title.x = element_blank(), axis.title.y = element_blank()) +
-  ggtitle("Median payment amount per claim each month")
+  ggtitle("Median award amount over time")
 ```
 Those 2025 spikes must be the child seperation payments
 
@@ -420,7 +420,7 @@ mega_data_summary_by_citation_cause |>
     scale_color_discrete(labels = c("Aircrash", "Fire flood", "False arrest", "Medical malpractice", "Miscellany", "Prop. Maint.", "Prop. Seize.", "Traffic"), name = "Citation code")+
     theme_light()+
     theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1), axis.title.x = element_blank())+
-    ggtitle("Number of claims each month by citation code")
+    ggtitle("Number of payments by citation code")
 ```
 
 
@@ -613,7 +613,7 @@ mega_data|>
   scale_x_continuous(breaks = scales::pretty_breaks())+
   theme_light()+
   theme(axis.title.x = element_blank()) +
-  ggtitle("Number of successful claims with citation code false arrest each year since 2008")
+  ggtitle("Number of successful false arrest claims each year since 2008")
 ```
 
 lets see how much money has been paid out for false arrests claims
@@ -629,10 +629,11 @@ mega_data %>%
   scale_x_discrete(drop = FALSE)+
   scale_fill_discrete(guide = "none")+
   theme_light()+
-  theme(axis.title.x = element_blank()) +
-  ggtitle("Total amount withdrawn from the judgement fund for 'false arrest' claims since 2008")
+  theme(axis.title.x = element_blank(), plot.title = element_text(size = 11)) +
+  ggtitle("Total amount withdrawn from the judgement fund for false arrest claims since 2008")
 
 ```
+
 There's nothing for the past few years, which suggests that these payments might operate on a significant delay. That, in turn, suggests that they are mostly resolved litigatively. Let's test that hypothesis.
 
 ```{r}
@@ -643,14 +644,14 @@ mega_data|>
   summarize(count = n_distinct(payment_id_number))%>%
   ggplot(aes(x = factor(year), y = count, fill = judgment_type_code)) +
   geom_col(position="fill")+
-  scale_y_continuous(breaks = scales::pretty_breaks(n = 10), name = "percent", label = scales::label_percent(), expand = expansion(mult = c(0, 0.05)))+
+  scale_y_continuous(breaks = scales::pretty_breaks(n = 10), name = "percent", label = scales::label_percent(), expand = expansion(mult = c(0, 0)))+
   scale_x_discrete()+
   scale_fill_discrete(labels = c("Administrative", 
                                    "Litigative"),
                         name = "Means of resolution") +
   theme_light()+
   theme(axis.title.x = element_blank(), axis.text.x = element_text(angle = 45, vjust = 1, hjust=1), axis.title.y = element_blank()) +
-  ggtitle("Percent of 'false arrest' claims since 2008 resolved through litigation")
+  ggtitle("Percent of false arrest claims since 2008 resolved through litigation")
 
 ```
 
@@ -666,7 +667,7 @@ mega_data|>
     #scale_x_continuous(breaks = scales::pretty_breaks(n=20), name = "Count")+
     #scale_fill_discrete(guide = "none")+
     theme_light()+
-    ggtitle("Distribution of payment amounts since 2008")
+    ggtitle("Distribution of payment amounts for false arrest claims since 2008")
 
 ```
 
@@ -728,6 +729,27 @@ mega_data|>
     scale_x_continuous(name = "Payment amount", expand = c(0, 0), limits = c(0, NA), breaks = seq(0, 10000000, by = 500000), minor_breaks = seq(0, 10000000, by = 50000), labels = scales::label_dollar())+
     #facet_wrap(~judgment_type_code, scales = "free_y", ncol=1) +
     theme_light()
+```
+
+
+
+```{r}
+#this is to generate something that's checkable
+arnold_and_porter<- mega_data|>
+  filter(plaintiffs_counsel_name %in% c("ARNOLD & PORTER KAY SCHOLER LLP", "Arnold & Porter Kaye Scholer LLP", "ARNOLD & PORTER KAYE SCHOLER LLP", "Arnold &Porter Kaye Scholer LLP"))|>
+  select(payment_sent_date, payment_amount, principle_citation_code, judgment_type_code)
+
+write.csv(arnold_and_porter, "arnold_and_porter.csv")
+
+```
+
+```{r}
+#this is to generate something that's checkable
+immigration_project<- mega_data|>
+  filter(plaintiffs_counsel_name %in% c("National Immigration Project", "NATIONAL IMMIGRATION PROJECT OF NATIONAL LAWYERS GUILD, INC", "National Immigration Project of National Lawyers Guild, Inc.", "NATIONAL IMMIGRATION PROJECT OF NLG", "National Immigration Project of the National Lawyers Guild"))|>
+  select(payment_sent_date, payment_amount, principle_citation_code, judgment_type_code)
+
+write.csv(immigration_project, "immigration_proj.csv")
 ```
 
 TO DO:
